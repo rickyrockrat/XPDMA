@@ -1,0 +1,8 @@
+<#: ttcl/GetValueSimParam.ttcl :>
+<: if {$gen_ies_gt_wrappers} ttcl_return :>
+<: if {$pcie_ext_gt_common_string == "FALSE"} ttcl_return :>
+<: setFileName "axi_pcie_v2_8_0_pcie_7x_v2_0_2_gt_common" :>
+<: setFileExtension ".v" :>
+<: setOutputDirectory [ttcl_string_concat $ComponentName "/example_design/support"] :>
+<#: ttcl/header.ttcl :>
+<#: ttcl/gt_common_vlog.ttcl :>

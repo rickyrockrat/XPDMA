@@ -23,12 +23,12 @@ void xpdma_close(xpdma_t * device);
 /**
  * Send data to DDR
  */
-int xpdma_send(xpdma_t *fpga, void *data, unsigned int count, unsigned int addr);
+int xpdma_send(xpdma_t *fpga, void *data, unsigned int count, unsigned int addr, int mem_type);
 
 /**
  * Receive data from DDR
  */
-int xpdma_recv(xpdma_t *fpga, void *data, unsigned int count, unsigned int addr);
+int xpdma_recv(xpdma_t *fpga, void *data, unsigned int count, unsigned int addr, int mem_type);
 
 /**
  *

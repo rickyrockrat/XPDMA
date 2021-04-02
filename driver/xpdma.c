@@ -100,7 +100,7 @@ void xpdma_close(xpdma_t * device) {
     //printf ("end free DEVICE\n");
 }
 
-int xpdma_send(xpdma_t *fpga, void *data, unsigned int count, unsigned int addr)
+int xpdma_send(xpdma_t *fpga, void *data, unsigned int count, unsigned int addr, int mem_type)
 {
     ////logger("xpdma_send ", addr);
     if (fpga == NULL)
@@ -109,7 +109,7 @@ int xpdma_send(xpdma_t *fpga, void *data, unsigned int count, unsigned int addr)
     if ( addr % 4 )
         return -1;
     
-    cdmaBuffer_t buffer = {fpga->id, data, count, addr};
+    cdmaBuffer_t buffer = {fpga->id, mem_type, data, count, addr};
     
     ////logger("xpdma_send: lock\n");
     //sem_wait (sem); 
@@ -121,7 +121,7 @@ int xpdma_send(xpdma_t *fpga, void *data, unsigned int count, unsigned int addr)
     return 0;
 }
 
-int xpdma_recv(xpdma_t *fpga, void *data, unsigned int count, unsigned int addr)
+int xpdma_recv(xpdma_t *fpga, void *data, unsigned int count, unsigned int addr, int mem_type)
 {
     //logger("xpdma_recv ", addr);
     if (fpga == NULL)
@@ -130,7 +130,7 @@ int xpdma_recv(xpdma_t *fpga, void *data, unsigned int count, unsigned int addr)
     if ( addr % 4 )
         return -1;
 
-    cdmaBuffer_t buffer = {fpga->id, data, count, addr};
+    cdmaBuffer_t buffer = {fpga->id, mem_type, data, count, addr};
     
     ////logger("xpdma_recv: lock\n");
     //sem_wait (sem); 

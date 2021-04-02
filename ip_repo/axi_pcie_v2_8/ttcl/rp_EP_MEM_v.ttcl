@@ -1,0 +1,7 @@
+<#: ttcl/GetValueSimParam.ttcl :>
+<: if {$ep} ttcl_return :>
+<: setFileName "EP_MEM" :>
+<: setFileExtension ".v" :>
+<: setOutputDirectory [ttcl_string_concat $ComponentName "/simulation/ep"] :>
+<#: ttcl/header.ttcl :>
+<#: ttcl/EP_MEM_vlog.ttcl :>

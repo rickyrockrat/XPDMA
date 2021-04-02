@@ -1,0 +1,644 @@
+<#: ttcl/GetValueSimParam.ttcl :>
+<: if {$pcie_ext_gt_common_string == "FALSE" && $pcie_ext_clk_string == "FALSE"} ttcl_return :>
+<: setFileName  [ttcl_string_concat $ComponentName "_support"] :>
+<: setFileExtension ".v" :>
+<: setOutputDirectory [ttcl_string_concat $ComponentName "/example_design/support"] :>
+<#: ttcl/header.ttcl :>
+//-----------------------------------------------------------------------------
+// Project    : AXI PCIe example design
+// File       : support.v
+// Version    : 2.2
+//--
+//-- Description:  PCI Express Endpoint example FPGA design
+//--CSL logic 
+//Hierarchy   : consists of axi_pcie_0, ext_pipe_clk & ext_gt_common 
+//					|--axi_pcie_0_support If either of or both PCIE_EXT_CLK & PCIE_EXT_GT_COMMON are TRUE
+//						|
+//						|--ext_pipe_clk(external pipe clock)
+//						|--ext_gt_common(external gt common)
+//						|--axi_pcie_0
+//							|
+//							|--axi_pcie (axi pcie design)
+//								|
+//								|--<various>
+// 
+//------------------------------------------------------------------------------
+
+`timescale 1ns / 1ps
+
+module <: print $ComponentName :>_support # (
+  parameter C_NO_OF_LANES       = 4,
+  parameter CLK_SHARING_EN          = "FALSE",                 // Enable Clock Sharing
+  parameter C_DATA_WIDTH        = 64, // RX/TX interface data width
+  parameter KEEP_WIDTH          = C_DATA_WIDTH / 8, // TSTRB width
+  parameter PCIE_EXT_CLK        = "FALSE",  // Use External Clocking Module
+  parameter PCIE_EXT_GT_COMMON  = "FALSE",
+  parameter REF_CLK_FREQ        = 0,
+  parameter USER_CLK_FREQ      = 2,                       // PCIe user clock 1 frequency
+  parameter USERCLK2_FREQ      = 2,                       // PCIe user clock 2 frequency
+  parameter PCIE_GT_DEVICE          = "GTX",                   // PCIe GT device
+  parameter PCIE_USE_MODE           = "3.0"                    // PCIe use mode
+) (
+  output  [(C_NO_OF_LANES - 1):0]    pci_exp_txp,
+  output  [(C_NO_OF_LANES - 1):0]    pci_exp_txn,
+  input   [(C_NO_OF_LANES - 1):0]    pci_exp_rxp,
+  input   [(C_NO_OF_LANES - 1):0]    pci_exp_rxn,
+
+
+  input                                       sys_clk,
+  input                                       axi_aresetn,
+  output                                      mmcm_lock,
+
+  //bram interface
+	output [31 : 0] m_axi_awaddr,
+	output [7 : 0] m_axi_awlen,
+	output [2 : 0] m_axi_awsize,
+	output [1 : 0] m_axi_awburst,
+	output [2 : 0] m_axi_awprot,
+	output m_axi_awvalid,
+	input m_axi_awready,
+	output m_axi_awlock,
+	output [3 : 0] m_axi_awcache,
+	output [(C_DATA_WIDTH-1) : 0] m_axi_wdata,
+	output [(KEEP_WIDTH -1) : 0] m_axi_wstrb,
+	output m_axi_wlast,
+	output m_axi_wvalid,
+	input m_axi_wready,
+	input [1 : 0] m_axi_bresp,
+	input m_axi_bvalid,
+	output m_axi_bready,
+	output [31 : 0] m_axi_araddr,
+	output [7 : 0] m_axi_arlen,
+	output [2 : 0] m_axi_arsize,
+	output [1 : 0] m_axi_arburst,
+	output [2 : 0] m_axi_arprot,
+	output m_axi_arvalid,
+	input m_axi_arready,
+	output m_axi_arlock,
+	output [3 : 0] m_axi_arcache,
+	input [(C_DATA_WIDTH-1) : 0] m_axi_rdata,
+	input [1 : 0] m_axi_rresp,
+	input m_axi_rlast,
+	input m_axi_rvalid,
+	output m_axi_rready,
+
+        input  [3 : 0] s_axi_awid,
+        input  [31 : 0] s_axi_awaddr,
+        input  [3 : 0] s_axi_awregion,
+        input  [7 : 0] s_axi_awlen,
+        input  [2 : 0] s_axi_awsize,
+        input  [1 : 0] s_axi_awburst,
+        input  s_axi_awvalid,
+        output  s_axi_awready,
+        input  [(C_DATA_WIDTH-1) : 0] s_axi_wdata,
+        input  [(KEEP_WIDTH -1) : 0] s_axi_wstrb,
+        input  s_axi_wlast,
+        input  s_axi_wvalid,
+        output  s_axi_wready,
+        output  [3 : 0] s_axi_bid,
+        output  [1 : 0] s_axi_bresp,
+        output  s_axi_bvalid,
+        input  s_axi_bready,
+        input  [3 : 0] s_axi_arid,
+        input  [31 : 0] s_axi_araddr,
+        input  [3 : 0] s_axi_arregion,
+        input  [7 : 0] s_axi_arlen,
+        input  [2 : 0] s_axi_arsize,
+        input  [1 : 0] s_axi_arburst,
+        input  s_axi_arvalid,
+        output  s_axi_arready,
+        output  [3 : 0] s_axi_rid,
+        output  [(C_DATA_WIDTH-1) : 0] s_axi_rdata,
+        output  [1 : 0] s_axi_rresp,
+        output  s_axi_rlast,
+        output  s_axi_rvalid,
+        input  s_axi_rready,
+
+        input  [31 : 0] s_axi_ctl_awaddr,
+        input  s_axi_ctl_awvalid,
+        output  s_axi_ctl_awready,
+        input  [31 : 0] s_axi_ctl_wdata,
+        input  [3 : 0] s_axi_ctl_wstrb,
+        input  s_axi_ctl_wvalid,
+        output  s_axi_ctl_wready,
+        output  [1 : 0] s_axi_ctl_bresp,
+        output  s_axi_ctl_bvalid,
+        input  s_axi_ctl_bready,
+        input  [31 : 0] s_axi_ctl_araddr,
+        input  s_axi_ctl_arvalid,
+        output  s_axi_ctl_arready,
+        output  [31 : 0] s_axi_ctl_rdata,
+        output  [1 : 0] s_axi_ctl_rresp,
+        output  s_axi_ctl_rvalid,
+        input  s_axi_ctl_rready,
+	
+	 output axi_aclk_out,
+
+// 2. Clock & GT COMMON Sharing Interface                                                 
+  output                                     pipe_pclk_out_slave,
+  output                                     pipe_rxusrclk_in,
+  output [(C_NO_OF_LANES - 1) : 0] pipe_rxoutclk_in,
+  output                                     pipe_dclk_in,
+  output                                     pipe_userclk1_in,
+  output                                     pipe_userclk2_in,
+  output                                     pipe_oobclk_in,
+  output                                     pipe_mmcm_lock_in,
+<: if {($pcie_ext_gt_common_string == "TRUE")} { :>
+  output  [1:0]                              qpll_qplllock,
+  output  [1:0]                              qpll_qplloutclk,
+  output  [1:0]                              qpll_qplloutrefclk,
+<: } :>
+
+  input  [(C_NO_OF_LANES - 1) : 0] pipe_pclk_sel_slave,
+
+<: if {($transceiver_ctrl_status_ports_string == "TRUE")} { :>
+  input   [ 2:0]                              pipe_txprbssel,
+  input   [ 2:0]                              pipe_rxprbssel,
+  input                                       pipe_txprbsforceerr,
+  input                                       pipe_rxprbscntreset,
+  input   [ 2:0]                              pipe_loopback,
+  input  [C_NO_OF_LANES-1:0]      pipe_txinhibit,
+ 
+  output   [C_NO_OF_LANES-1:0]      pipe_rxprbserr,
+  output   [4:0]                              pipe_rst_fsm,
+  output   [11:0]                             pipe_qrst_fsm,
+  output   [(C_NO_OF_LANES*5)-1:0]  pipe_rate_fsm,
+  output   [(C_NO_OF_LANES*6)-1:0]  pipe_sync_fsm_tx,
+  output   [(C_NO_OF_LANES*7)-1:0]  pipe_sync_fsm_rx,
+  output   [(C_NO_OF_LANES*7)-1:0]  pipe_drp_fsm,
+  output                                      pipe_rst_idle,
+  output                                      pipe_qrst_idle,
+  output                                      pipe_rate_idle,
+  output   [C_NO_OF_LANES-1:0]          pipe_eyescandataerror,
+  output   [(C_NO_OF_LANES*3)-1:0]      pipe_rxstatus,
+  output   [(C_NO_OF_LANES*15)-1:0]     pipe_dmonitorout,
+
+  output     [(C_NO_OF_LANES)-1:0]    pipe_cpll_lock,
+  output     [(C_NO_OF_LANES-1)>>2:0] pipe_qpll_lock,
+  output     [(C_NO_OF_LANES)-1:0]    pipe_rxpmaresetdone,       
+  output     [(C_NO_OF_LANES*3)-1:0]  pipe_rxbufstatus,         
+  output     [(C_NO_OF_LANES)-1:0]    pipe_txphaligndone,       
+  output     [(C_NO_OF_LANES)-1:0]    pipe_txphinitdone,        
+  output     [(C_NO_OF_LANES)-1:0]    pipe_txdlysresetdone,    
+  output     [(C_NO_OF_LANES)-1:0]    pipe_rxphaligndone,      
+  output     [(C_NO_OF_LANES)-1:0]    pipe_rxdlysresetdone,     
+  output     [(C_NO_OF_LANES)-1:0]    pipe_rxsyncdone,       
+  output     [(C_NO_OF_LANES*8)-1:0]  pipe_rxdisperr,       
+  output     [(C_NO_OF_LANES*8)-1:0]  pipe_rxnotintable,      
+  output     [(C_NO_OF_LANES)-1:0]    pipe_rxcommadet,        
+
+  output   [C_NO_OF_LANES-1:0]      gt_ch_drp_rdy,
+  output   [C_NO_OF_LANES-1:0]      pipe_debug_0,
+  output   [C_NO_OF_LANES-1:0]      pipe_debug_1,
+  output   [C_NO_OF_LANES-1:0]      pipe_debug_2,
+  output   [C_NO_OF_LANES-1:0]      pipe_debug_3,
+  output   [C_NO_OF_LANES-1:0]      pipe_debug_4,
+  output   [C_NO_OF_LANES-1:0]      pipe_debug_5,
+  output   [C_NO_OF_LANES-1:0]      pipe_debug_6,
+  output   [C_NO_OF_LANES-1:0]      pipe_debug_7,
+  output   [C_NO_OF_LANES-1:0]      pipe_debug_8,
+  output   [C_NO_OF_LANES-1:0]      pipe_debug_9,
+  output   [31:0]                             pipe_debug,
+<: } :>
+
+<: if {($ext_pipe_interface_string == "TRUE")} { :>
+  //----------------------------------------------------------------------------------------------------------------//
+  // PIPE PORTS to TOP Level For PIPE SIMULATION with 3rd Party IP/BFM/Xilinx BFM
+  //----------------------------------------------------------------------------------------------------------------//
+  input wire   [11:0]                         common_commands_in,
+  input wire   [24:0]                         pipe_rx_0_sigs,
+  input wire   [24:0]                         pipe_rx_1_sigs,
+  input wire   [24:0]                         pipe_rx_2_sigs,
+  input wire   [24:0]                         pipe_rx_3_sigs,
+  input wire   [24:0]                         pipe_rx_4_sigs,
+  input wire   [24:0]                         pipe_rx_5_sigs,
+  input wire   [24:0]                         pipe_rx_6_sigs,
+  input wire   [24:0]                         pipe_rx_7_sigs,
+
+  output wire  [11:0]                         common_commands_out,
+  output wire  [24:0]                         pipe_tx_0_sigs,
+  output wire  [24:0]                         pipe_tx_1_sigs,
+  output wire  [24:0]                         pipe_tx_2_sigs,
+  output wire  [24:0]                         pipe_tx_3_sigs,
+  output wire  [24:0]                         pipe_tx_4_sigs,
+  output wire  [24:0]                         pipe_tx_5_sigs,
+  output wire  [24:0]                         pipe_tx_6_sigs,
+  output wire  [24:0]                         pipe_tx_7_sigs,
+<: } :>
+
+<: if {($ext_ch_gt_drp_string == "TRUE")} { :>
+  //--------------Channel DRP---------------------------------
+  output                                       ext_ch_gt_drpclk,
+  input    [(C_NO_OF_LANES*9)-1:0]  ext_ch_gt_drpaddr,
+  input    [C_NO_OF_LANES-1:0]      ext_ch_gt_drpen,
+  input    [(C_NO_OF_LANES*16)-1:0] ext_ch_gt_drpdi,
+  input    [C_NO_OF_LANES-1:0]      ext_ch_gt_drpwe,
+  output   [(C_NO_OF_LANES*16)-1:0] ext_ch_gt_drpdo,
+  output   [C_NO_OF_LANES-1:0]      ext_ch_gt_drprdy,
+<: } :>
+  input                                       pipe_mmcm_rst_n
+  
+  );
+
+
+  wire                              [11:0]   qpll_drp_crscode;
+  wire                              [17:0]   qpll_drp_fsm;
+  wire                              [1:0]    qpll_drp_done;
+  wire                              [1:0]    qpll_drp_reset;
+  wire        [1:0]                               qpll_qplld;
+  wire                              [1:0]    qpll_qpllreset;
+  wire        [1:0]                               qpll_drp_clk;
+  wire        [1:0]                              qpll_drp_rst_n;
+  wire        [1:0]                               qpll_drp_ovrd;
+  wire        [1:0]                               qpll_drp_gen3;
+  wire        [1:0]                               qpll_drp_start;
+
+  wire                                       pipe_pclk_in     ; 
+  wire                                       pipe_txoutclk_out     ; 
+  wire                               [<=: expr {$max_lnk_wdt_int - 1} :>:0]   pipe_rxoutclk_out;      
+  wire                               [<=: expr {$max_lnk_wdt_int - 1} :>:0]   pipe_pclk_sel_out;      
+  wire                                       pipe_gen3_out    ; 
+  
+//Reference Clock for CPLLPD Fix
+  
+  wire gt_cpllpdrefclk;
+  wire axi_ctl_aclk_out;
+  
+  BUFG cpllpd_refclk_inst (.I (sys_clk), .O (gt_cpllpdrefclk));
+
+
+
+  // Generate External Clock Module if External Clocking is selected
+<: if {$pcie_ext_clk_string == "TRUE" } { :>
+
+
+      //---------- PIPE Clock Module -------------------------------------------------
+axi_pcie_v2_8_0_pcie_7x_v2_0_2_pipe_clock #
+      (
+          .PCIE_ASYNC_EN                  ( "FALSE" ),     // PCIe async enable
+          .PCIE_TXBUF_EN                  ( "FALSE" ),     // PCIe TX buffer enable for Gen1/Gen2 only
+<: if {! $gen_ies_gt_wrappers} {  :>
+          .PCIE_CLK_SHARING_EN            ( CLK_SHARING_EN ),              // Enable Clock Sharing
+<: } :>
+          .PCIE_LANE                      ( C_NO_OF_LANES ),     // PCIe number of lanes
+          // synthesis translate_off
+          .PCIE_LINK_SPEED                ( 2 ),
+          //.PCIE_LINK_SPEED                ( <=: expr {$max_lnk_spd_string - 1} :> ),
+          // synthesis translate_on
+          .PCIE_REFCLK_FREQ               ( REF_CLK_FREQ ),     // PCIe reference clock frequency
+          .PCIE_USERCLK1_FREQ             ( USER_CLK_FREQ ),     // PCIe user clock 1 frequency
+          .PCIE_USERCLK2_FREQ             ( USERCLK2_FREQ ),     // PCIe user clock 2 frequency
+          .PCIE_DEBUG_MODE                ( 0 )
+      )
+      pipe_clock_i
+      (
+
+          //---------- Input -------------------------------------
+          .CLK_CLK                        ( sys_clk ),
+          .CLK_TXOUTCLK                   ( pipe_txoutclk_out ),     // Reference clock from lane 0
+          .CLK_RXOUTCLK_IN                ( pipe_rxoutclk_out ),
+          .CLK_RST_N                      ( pipe_mmcm_rst_n ),      // Allow system reset for error_recovery             
+          .CLK_PCLK_SEL                   ( pipe_pclk_sel_out ),
+<: if {! $gen_ies_gt_wrappers} {  :>
+          .CLK_PCLK_SEL_SLAVE             ( pipe_pclk_sel_slave),
+<: } :>
+          .CLK_GEN3                       ( pipe_gen3_out ),
+
+          //---------- Output ------------------------------------
+          .CLK_PCLK                       ( pipe_pclk_in ),
+<: if {! $gen_ies_gt_wrappers} {  :>
+          .CLK_PCLK_SLAVE                 ( pipe_pclk_out_slave),
+<: } :>
+          .CLK_RXUSRCLK                   ( pipe_rxusrclk_in ),
+          .CLK_RXOUTCLK_OUT               ( pipe_rxoutclk_in ),
+          .CLK_DCLK                       ( pipe_dclk_in ),
+<: if {! $gen_ies_gt_wrappers} {  :>
+          .CLK_OOBCLK                     ( pipe_oobclk_in),
+<: } :>
+          .CLK_USERCLK1                   ( pipe_userclk1_in ),
+          .CLK_USERCLK2                   ( pipe_userclk2_in ),
+          .CLK_MMCM_LOCK                  ( pipe_mmcm_lock_in )
+
+      );
+<: } else { :>
+      assign pipe_pclk_in      = 1'b0;
+      assign pipe_rxusrclk_in  = 1'b0;
+      assign pipe_rxoutclk_in  = 2'b0;   
+      assign pipe_dclk_in      = 1'b0;
+      assign pipe_userclk1_in  = 1'b0;
+      assign pipe_userclk2_in  = 1'b0;
+      assign pipe_mmcm_lock_in = 1'b0;
+      assign pipe_oobclk_in    = 1'b0;
+<: } :>
+
+// Generate External GT COMMON Module.  Otherwise use identical GT COMMON module which is embedded in Pipe Wrapper
+<: if {$pcie_ext_gt_common_string == "TRUE" } { :>
+
+
+    //---------- GT COMMON External Module ---------------------------------------
+axi_pcie_v2_8_0_pcie_7x_v2_0_2_gt_common #
+            (
+ 	        .PCIE_USE_MODE                  (PCIE_USE_MODE),                // PCIe use mode
+	        .PCIE_GT_DEVICE                 (PCIE_GT_DEVICE),                // PCIe  
+   		// synthesis translate_off
+                .PCIE_SIM_MODE                  ("TRUE"),                // PCIe sim mode
+                // synthesis translate_on
+                .PCIE_REFCLK_FREQ               (REF_CLK_FREQ)       // PCIe reference clock frequency
+            )
+            gt_common_i_0
+            (
+                //---------- Input -------------------------
+                .PIPE_CLK                       (sys_clk),
+                .CPLLPDREFCLK                   (gt_cpllpdrefclk),
+                .QPLL_QPLLPD                    (qpll_qplld[0]),
+                .QPLL_QPLLRESET                 (qpll_qpllreset[0]),
+                .QPLL_DRP_CLK                   (qpll_drp_clk[0] ),
+                .QPLL_DRP_RST_N                 (qpll_drp_rst_n[0]),
+                .QPLL_DRP_OVRD                  (qpll_drp_ovrd[0] ),
+                .QPLL_DRP_GEN3                  (qpll_drp_gen3[0]),
+                .QPLL_DRP_START                 (qpll_drp_start[0]),
+
+               //---------- Output ------------------------
+                .QPLL_DRP_CRSCODE               (qpll_drp_crscode[5:0]),
+                .QPLL_DRP_FSM                   (qpll_drp_fsm [8:0]),
+                .QPLL_DRP_DONE                  (qpll_drp_done[0]),
+                .QPLL_DRP_RESET                 (qpll_drp_reset[0]),
+                .QPLL_QPLLOUTCLK                (qpll_qplloutclk[0]),
+                .QPLL_QPLLOUTREFCLK             (qpll_qplloutrefclk[0]),
+                .QPLL_QPLLLOCK                  (qpll_qplllock [0])
+            );
+           axi_pcie_v2_8_0_pcie_7x_v2_0_2_gt_common #
+            (
+ 	        .PCIE_USE_MODE                  (PCIE_USE_MODE),                // PCIe use mode
+	        .PCIE_GT_DEVICE                 (PCIE_GT_DEVICE),                // PCIe  
+                // synthesis translate_off
+                .PCIE_SIM_MODE                  ("TRUE"),                // PCIe sim mode
+                // synthesis translate_on
+                .PCIE_REFCLK_FREQ               (REF_CLK_FREQ)       // PCIe reference clock frequency
+            )
+                gt_common_i_1
+            (
+                //---------- Input -------------------------
+                .PIPE_CLK                       (sys_clk),
+                .QPLL_QPLLPD                    (qpll_qplld[1]),
+                .QPLL_QPLLRESET                 (qpll_qpllreset[1]),
+                .QPLL_DRP_CLK                   (qpll_drp_clk[1] ),
+                .QPLL_DRP_RST_N                 (qpll_drp_rst_n[1]),
+                .QPLL_DRP_OVRD                  (qpll_drp_ovrd[1] ),
+                .QPLL_DRP_GEN3                  (qpll_drp_gen3[1]),
+                .QPLL_DRP_START                 (qpll_drp_start[1]),
+                //---------- Output ------------------------
+                .QPLL_DRP_CRSCODE               (qpll_drp_crscode[11:6]),
+                .QPLL_DRP_FSM                   (qpll_drp_fsm [17:9]),
+                .QPLL_DRP_DONE                  (qpll_drp_done[1]),
+                .QPLL_DRP_RESET                 (qpll_drp_reset[1]),
+                .QPLL_QPLLOUTCLK                (qpll_qplloutclk[1]),
+                .QPLL_QPLLOUTREFCLK             (qpll_qplloutrefclk[1]),
+                .QPLL_QPLLLOCK                  (qpll_qplllock [1])
+            );
+
+<: } else { :>
+
+            assign qpll_drp_done                         =  2'd0;
+            assign qpll_drp_reset                        =  2'd0;
+            assign qpll_drp_crscode                      =  12'd0;
+            assign qpll_drp_fsm                          =  18'd0;
+            assign qpll_qplloutclk                       =  2'd0;
+            assign qpll_qplloutrefclk                    =  2'd0;
+            assign qpll_qplllock                         =  2'd0;
+<: } :>
+
+ <: print $ComponentName :>  
+  <: print $ComponentName :>_i
+ (
+<: if {($axi_aclk_loopback_string == "TRUE")} { :>
+  .axi_aclk		(axi_aclk_out),		
+  .axi_ctl_aclk		(axi_ctl_aclk_out),
+<: } :>
+  .axi_aresetn		(axi_aresetn),
+  .axi_aclk_out		(axi_aclk_out),
+  .axi_ctl_aclk_out	(axi_ctl_aclk_out),	
+  .mmcm_lock		(mmcm_lock),	
+  .interrupt_out	(),	
+  .INTX_MSI_Request	(1'b0),	
+  .INTX_MSI_Grant	(),	
+  .MSI_enable		(),	
+  .MSI_Vector_Num	(5'b0),	
+  .MSI_Vector_Width	(),		
+  .s_axi_awid		(4'b0),	
+  .s_axi_awaddr		(s_axi_awaddr),	
+  .s_axi_awregion	(4'b0),		
+  .s_axi_awlen		(s_axi_awlen),	
+  .s_axi_awsize		(s_axi_awsize),		
+  .s_axi_awburst	(s_axi_awburst),			
+  .s_axi_awvalid	(s_axi_awvalid),		
+  .s_axi_awready	(s_axi_awready),		
+  .s_axi_wdata		(s_axi_wdata),		
+  .s_axi_wstrb		(s_axi_wstrb),			
+  .s_axi_wlast		(s_axi_wlast),		
+  .s_axi_wvalid		(s_axi_wvalid),		
+  .s_axi_wready		(s_axi_wready),		
+  .s_axi_bid		(),	
+  .s_axi_bresp		(s_axi_bresp),	
+  .s_axi_bvalid		(s_axi_bvalid),		
+  .s_axi_bready		(s_axi_bready),		
+  .s_axi_arid		(4'b0),		
+  .s_axi_araddr		(s_axi_araddr[31:0]),		
+  .s_axi_arregion	(4'b0),		
+  .s_axi_arlen		(s_axi_arlen[7:0]),	
+  .s_axi_arsize		(s_axi_arsize[2:0]),		
+  .s_axi_arburst	(s_axi_arburst[1:0]),
+  .s_axi_arvalid	(s_axi_arvalid),
+  .s_axi_arready	(s_axi_arready),
+  .s_axi_rid		(),
+  .s_axi_rdata		(s_axi_rdata),	
+  .s_axi_rresp		(s_axi_rresp),
+  .s_axi_rlast		(s_axi_rlast),
+  .s_axi_rvalid		(s_axi_rvalid),
+  .s_axi_rready		(s_axi_rready),
+  .m_axi_awaddr		(m_axi_awaddr),
+  .m_axi_awlen		(m_axi_awlen	),
+  .m_axi_awsize		(m_axi_awsize	),
+  .m_axi_awburst	(m_axi_awburst),
+  .m_axi_awprot		(m_axi_awprot	),
+  .m_axi_awvalid	(m_axi_awvalid),
+  .m_axi_awready	(m_axi_awready),	
+  .m_axi_awlock		(m_axi_awlock	),
+  .m_axi_awcache	(m_axi_awcache),
+  .m_axi_wdata		(m_axi_wdata	),
+  .m_axi_wstrb		(m_axi_wstrb	),
+  .m_axi_wlast		(m_axi_wlast	),
+  .m_axi_wvalid		(m_axi_wvalid	),
+  .m_axi_wready		(m_axi_wready	),
+  .m_axi_bresp		(m_axi_bresp	),
+  .m_axi_bvalid		(m_axi_bvalid	),
+  .m_axi_bready		(m_axi_bready	),
+  .m_axi_araddr		(m_axi_araddr	),
+  .m_axi_arlen		(m_axi_arlen	),
+  .m_axi_arsize		(m_axi_arsize	),
+  .m_axi_arburst	(m_axi_arburst),
+  .m_axi_arprot		(m_axi_arprot	),
+  .m_axi_arvalid	(m_axi_arvalid),
+  .m_axi_arready	(m_axi_arready),
+  .m_axi_arlock		(m_axi_arlock	),
+  .m_axi_arcache	(m_axi_arcache),       
+  .m_axi_rdata		(m_axi_rdata	),
+  .m_axi_rresp		(m_axi_rresp	),
+  .m_axi_rlast		(m_axi_rlast	),
+  .m_axi_rvalid		(m_axi_rvalid	),
+  .m_axi_rready		(m_axi_rready	),
+  .pci_exp_txp          ( pci_exp_txp ),
+  .pci_exp_txn          ( pci_exp_txn ),
+  .pci_exp_rxp          ( pci_exp_rxp ),
+  .pci_exp_rxn          ( pci_exp_rxn ),
+  .REFCLK		(sys_clk),
+  .s_axi_ctl_awaddr	(s_axi_ctl_awaddr),
+  .s_axi_ctl_awvalid	(s_axi_ctl_awvalid),
+  .s_axi_ctl_awready	(s_axi_ctl_awready),
+  .s_axi_ctl_wdata	(s_axi_ctl_wdata),
+  .s_axi_ctl_wstrb	(s_axi_ctl_wstrb),
+  .s_axi_ctl_wvalid	(s_axi_ctl_wvalid),
+  .s_axi_ctl_wready	(s_axi_ctl_wready),
+  .s_axi_ctl_bresp	(s_axi_ctl_bresp),
+  .s_axi_ctl_bvalid	(s_axi_ctl_bvalid),
+  .s_axi_ctl_bready	(s_axi_ctl_bready),
+  .s_axi_ctl_araddr	(s_axi_ctl_araddr),
+  .s_axi_ctl_arvalid	(s_axi_ctl_arvalid),
+  .s_axi_ctl_arready	(s_axi_ctl_arready),
+  .s_axi_ctl_rdata	(s_axi_ctl_rdata),
+  .s_axi_ctl_rresp	(s_axi_ctl_rresp),
+  .s_axi_ctl_rvalid	(s_axi_ctl_rvalid),
+
+  //External GT COMMON Ports
+<: if {($pcie_ext_gt_common_string == "TRUE")} { :>
+
+  .qpll_drp_crscode                           ( qpll_drp_crscode ),
+  .qpll_drp_fsm                               ( qpll_drp_fsm ),
+  .qpll_drp_done                              ( qpll_drp_done ),
+  .qpll_drp_reset                             ( qpll_drp_reset ),
+  .qpll_qplllock                              ( qpll_qplllock ),
+  .qpll_qplloutclk                            ( qpll_qplloutclk ),
+  .qpll_qplloutrefclk                         ( qpll_qplloutrefclk ),
+  .qpll_qplld                                 ( qpll_qplld ),
+  .qpll_qpllreset                             ( qpll_qpllreset ),
+  .qpll_drp_clk                               ( qpll_drp_clk ),
+  .qpll_drp_rst_n                             ( qpll_drp_rst_n ),
+  .qpll_drp_ovrd                              ( qpll_drp_ovrd ),
+  .qpll_drp_gen3                              ( qpll_drp_gen3),
+
+
+  .qpll_drp_start                             ( qpll_drp_start ),
+<: } :>
+ //------------TRANSCEIVER DEBUG-----------------------------------
+ //Drive these inputs to 0s
+<: if {($ext_ch_gt_drp_string == "TRUE")} { :>
+  
+  .ext_ch_gt_drpclk                           (ext_ch_gt_drpclk ),
+  .ext_ch_gt_drpaddr                          (ext_ch_gt_drpaddr),
+  .ext_ch_gt_drpen                            (ext_ch_gt_drpen  ),
+  .ext_ch_gt_drpdi                            (ext_ch_gt_drpdi  ),
+  .ext_ch_gt_drpwe                            (ext_ch_gt_drpwe  ),
+
+  .ext_ch_gt_drpdo                            ( ext_ch_gt_drpdo  ),
+  .ext_ch_gt_drprdy                           ( ext_ch_gt_drprdy ),
+<: } :>
+<: if {($pcie_ext_clk_string == "TRUE")} { :>
+  .clk_fab_refclk                ( pipe_rxoutclk_in   ),
+  .clk_pclk                      ( pipe_pclk_in       ),
+  .clk_rxusrclk                  ( pipe_rxusrclk_in  ),
+  .clk_dclk                      ( pipe_dclk_in      ),
+  .clk_userclk1                  ( pipe_userclk1_in  ),
+  .clk_userclk2                  ( pipe_userclk2_in  ),
+<: if {$gen_ies_gt_wrappers} { :>
+  .clk_oobclk_in                            ( 1'b0 ),
+<: } else { :>
+  .clk_oobclk_in                 ( pipe_oobclk_in    ),
+<: } :>
+  .clk_mmcm_lock                 ( pipe_mmcm_lock_in  ),
+  .pipe_mmcm_rst_n               ( pipe_mmcm_rst_n ),
+  .clk_txoutclk                  ( pipe_txoutclk_out  ),
+  .clk_rxoutclk                  ( pipe_rxoutclk_out  ),
+  .clk_pclk_sel                  ( pipe_pclk_sel_out  ),
+  .clk_gen3                      ( pipe_gen3_out     ),
+<: } :>
+
+<: if {($transceiver_ctrl_status_ports_string == "TRUE")} { :>
+
+  .pipe_txprbssel                             (pipe_txprbssel     ),
+  .pipe_rxprbssel                             (pipe_rxprbssel     ),
+  .pipe_txprbsforceerr                        (pipe_txprbsforceerr),
+  .pipe_rxprbscntreset                        (pipe_rxprbscntreset),
+  .pipe_loopback                              (pipe_loopback      ),
+  .pipe_txinhibit		              (pipe_txinhibit),
+
+  .pipe_rxprbserr                             (pipe_rxprbserr   ),
+  .pipe_rst_fsm                               (pipe_rst_fsm    ),
+  .pipe_qrst_fsm                              (pipe_qrst_fsm   ),
+  .pipe_rate_fsm                              (pipe_rate_fsm   ),
+  .pipe_sync_fsm_tx                           (pipe_sync_fsm_tx),
+  .pipe_sync_fsm_rx                           (pipe_sync_fsm_rx),
+  .pipe_drp_fsm                               (pipe_drp_fsm    ),
+  .pipe_rst_idle                              (pipe_rst_idle   ),
+  .pipe_qrst_idle                             (pipe_qrst_idle  ),
+  .pipe_rate_idle                             (pipe_rate_idle  ),
+  .gt_ch_drp_rdy                              (gt_ch_drp_rdy),
+  .pipe_eyescandataerror         (pipe_eyescandataerror),
+  .pipe_rxstatus	           (pipe_rxstatus),
+  .pipe_dmonitorout    	   (pipe_dmonitorout),
+
+  .pipe_cpll_lock( pipe_cpll_lock ),
+  .pipe_qpll_lock( pipe_qpll_lock ),
+  .pipe_rxpmaresetdone( pipe_rxpmaresetdone ),       
+  .pipe_rxbufstatus( pipe_rxbufstatus ),         
+  .pipe_txphaligndone( pipe_txphaligndone ),       
+  .pipe_txphinitdone( pipe_txphinitdone ),        
+  .pipe_txdlysresetdone( pipe_txdlysresetdone ),    
+  .pipe_rxphaligndone( pipe_rxphaligndone ),      
+  .pipe_rxdlysresetdone( pipe_rxdlysresetdone ),     
+  .pipe_rxsyncdone( pipe_rxsyncdone ),       
+  .pipe_rxdisperr( pipe_rxdisperr ),       
+  .pipe_rxnotintable( pipe_rxnotintable ),      
+  .pipe_rxcommadet( pipe_rxcommadet ),        
+
+
+  //---------- CHANNEL DRP  --------------------------------
+  .pipe_debug_0                               (pipe_debug_0 ),
+  .pipe_debug_1                               (pipe_debug_1 ),
+  .pipe_debug_2                               (pipe_debug_2 ),
+  .pipe_debug_3                               (pipe_debug_3 ),
+  .pipe_debug_4                               (pipe_debug_4 ),
+  .pipe_debug_5                               (pipe_debug_5 ),
+  .pipe_debug_6                               (pipe_debug_6 ),
+  .pipe_debug_7                               (pipe_debug_7 ),
+  .pipe_debug_8                               (pipe_debug_8 ),
+  .pipe_debug_9                               (pipe_debug_9 ),
+  .pipe_debug                                 (pipe_debug   ),
+<: } :>
+
+<: if {($ext_pipe_interface_string == "TRUE")} { :>
+      .common_commands_in	(common_commands_in	),
+      .pipe_rx_0_sigs		(pipe_rx_0_sigs		),
+      .pipe_rx_1_sigs		(pipe_rx_1_sigs		),
+      .pipe_rx_2_sigs		(pipe_rx_2_sigs		),
+      .pipe_rx_3_sigs		(pipe_rx_3_sigs		),
+      .pipe_rx_4_sigs		(pipe_rx_4_sigs		),
+      .pipe_rx_5_sigs		(pipe_rx_5_sigs		),
+      .pipe_rx_6_sigs		(pipe_rx_6_sigs		),
+      .pipe_rx_7_sigs		(pipe_rx_7_sigs		),
+                                                          
+      .common_commands_out	(common_commands_out	),
+      .pipe_tx_0_sigs		(pipe_tx_0_sigs		),
+      .pipe_tx_1_sigs		(pipe_tx_1_sigs		),
+      .pipe_tx_2_sigs		(pipe_tx_2_sigs		),
+      .pipe_tx_3_sigs		(pipe_tx_3_sigs		),
+      .pipe_tx_4_sigs		(pipe_tx_4_sigs		),
+      .pipe_tx_5_sigs		(pipe_tx_5_sigs		),
+      .pipe_tx_6_sigs		(pipe_tx_6_sigs		),
+      .pipe_tx_7_sigs		(pipe_tx_7_sigs		),
+
+<: } :>
+	
+  .s_axi_ctl_rready		        (s_axi_ctl_rready)
+);
+
+endmodule

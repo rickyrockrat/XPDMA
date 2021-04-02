@@ -1,0 +1,357 @@
+<#: ttcl/GetValueSimParam.ttcl :>
+<: if {$ep} ttcl_return :>
+<: setFileName  "m_axi_ctl_model" :>
+<: setFileExtension ".v" :>
+<: setOutputDirectory [ttcl_string_concat $ComponentName "/example_design"] :>
+<#: ttcl/header.ttcl :>
+//-----------------------------------------------------------------------------
+`timescale 1ns/1ps
+
+module m_axi_ctl_model #(
+  parameter PL_LINK_CAP_MAX_LINK_SPEED = 1, 
+  parameter PL_LINK_CAP_MAX_LINK_WIDTH = 1,
+  parameter NO_OF_CFG_TXN = 15,
+  parameter CY_GAP_BW_TXN = 8
+) (
+    //--------------------------------------------------------------
+    // Clock & Reset
+    input   wire                trans_m_axi_ctl_aclk,
+    input   wire                trans_m_axi_ctl_aresetn,
+    output  wire                user_link_up,
+    output  reg                 configs_completed,
+    //--------------------------------------------------------------
+    // AXI Read
+    input   wire                trans_m_axi_ctl_arready,
+    output  reg                 trans_m_axi_ctl_arvalid,
+    output  reg  [ 31:  0]      trans_m_axi_ctl_araddr,
+    output  reg                 trans_m_axi_ctl_rready,
+    input   wire                trans_m_axi_ctl_rvalid,
+    input   wire  [31:  0]      trans_m_axi_ctl_rdata,
+    input   wire  [  1:  0]     trans_m_axi_ctl_rresp,
+    //--------------------------------------------------------------
+    // AXI Write
+    input   wire                trans_m_axi_ctl_awready,
+    output  wire                trans_m_axi_ctl_awvalid,
+    output  wire  [ 31:  0]     trans_m_axi_ctl_awaddr,
+    input   wire                trans_m_axi_ctl_wready,
+    output  wire                trans_m_axi_ctl_wvalid,
+    output  wire  [31:  0]      trans_m_axi_ctl_wdata,
+    output  wire  [ 3:  0]      trans_m_axi_ctl_wstrb,
+    output  wire                trans_m_axi_ctl_wlast,
+    output  wire                trans_m_axi_ctl_bready,
+    input   wire                trans_m_axi_ctl_bvalid,
+    input   wire  [  1:  0]     trans_m_axi_ctl_bresp
+);
+  localparam                                  TCQ = 1;
+
+localparam CFG_TXN_RST = 2'b00;
+localparam CFG_TXN_GEN = 2'b01;
+localparam CFG_TXN_WIT = 2'b10;
+localparam CFG_RXN_GEN = 2'b00;
+localparam CFG_RXN_WIT = 2'b01;
+localparam CFG_RXN_IDL = 2'b10;
+
+reg [1:0] state;
+reg [1:0] rstate;
+reg [31:0] set_add[0:13];
+reg [31:0] set_data[0:13];
+
+  always @(posedge trans_m_axi_ctl_aclk) begin
+    if(!trans_m_axi_ctl_aresetn) begin
+      set_add[0]  <= #TCQ {32{1'b0}};  
+      set_add[1]  <= #TCQ {32{1'b0}};
+      set_add[2]  <= #TCQ {32{1'b0}};
+      set_add[3]  <= #TCQ {32{1'b0}};
+      set_add[4]  <= #TCQ {32{1'b0}};
+      set_add[5]  <= #TCQ {32{1'b0}};
+      set_add[6]  <= #TCQ {32{1'b0}};
+      set_add[7]  <= #TCQ {32{1'b0}};
+      set_add[8]  <= #TCQ {32{1'b0}};
+      set_add[9]  <= #TCQ {32{1'b0}};
+      set_add[10] <= #TCQ {32{1'b0}};
+      set_add[11] <= #TCQ {32{1'b0}};
+      set_add[12] <= #TCQ {32{1'b0}};
+      set_add[13] <= #TCQ {32{1'b0}};
+    end else begin
+      set_add[0]  <= #TCQ 32'h00000018;  
+      set_add[1]  <= #TCQ 32'h00000074;
+      set_add[2]  <= #TCQ 32'h00100010;
+      set_add[3]  <= #TCQ 32'h00100014;
+      set_add[4]  <= #TCQ 32'h00100018;
+      set_add[5]  <= #TCQ 32'h00100030;
+      set_add[6]  <= #TCQ 32'h00100010;
+      set_add[7]  <= #TCQ 32'h00100014;
+      set_add[8]  <= #TCQ 32'h00100018;
+      set_add[9]  <= #TCQ 32'h00100030;
+      set_add[10] <= #TCQ 32'h00100070;
+      set_add[11] <= #TCQ 32'h00100004;
+      set_add[12] <= #TCQ 32'h00001148;
+      set_add[13] <= #TCQ 32'h0000120C;
+    end
+  end
+
+  always @(posedge trans_m_axi_ctl_aclk) begin
+    if(!trans_m_axi_ctl_aresetn) begin
+      set_data[0]  <= #TCQ {32{1'b0}};  
+      set_data[1]  <= #TCQ {32{1'b0}};
+      set_data[2]  <= #TCQ {32{1'b0}};
+      set_data[3]  <= #TCQ {32{1'b0}};
+      set_data[4]  <= #TCQ {32{1'b0}};
+      set_data[5]  <= #TCQ {32{1'b0}};
+      set_data[6]  <= #TCQ {32{1'b0}};
+      set_data[7]  <= #TCQ {32{1'b0}};
+      set_data[8]  <= #TCQ {32{1'b0}};
+      set_data[9]  <= #TCQ {32{1'b0}};
+      set_data[10] <= #TCQ {32{1'b0}};
+      set_data[11] <= #TCQ {32{1'b0}};
+      set_data[12] <= #TCQ {32{1'b0}};
+      set_data[13] <= #TCQ {32{1'b0}};
+    end else begin
+      set_data[0]  <= #TCQ 32'h00010100;  
+      set_data[1]  <= #TCQ 32'h00000C80;
+      set_data[2]  <= #TCQ 32'hFFFFFFFF;
+      set_data[3]  <= #TCQ 32'hFFFFFFFF;
+      set_data[4]  <= #TCQ 32'hFFFFFFFF;
+      set_data[5]  <= #TCQ 32'hFFFFFFFF;
+      set_data[6]  <= #TCQ 32'h80000000;
+      set_data[7]  <= #TCQ 32'h10000000;
+      set_data[8]  <= #TCQ 32'h20000000;
+      set_data[9]  <= #TCQ 32'h80000001;
+      set_data[10] <= #TCQ 32'h00000041;
+      set_data[11] <= #TCQ 32'h00000006;
+      set_data[12] <= #TCQ 32'h00000001;
+      set_data[13] <= #TCQ 32'h80000000;
+    end
+  end
+
+reg         m_axi_ctl_awvalid;
+reg  [31:0] m_axi_ctl_awaddr;
+reg         m_axi_ctl_wvalid;
+reg  [31:0] m_axi_ctl_wdata;
+reg  [ 3:0] m_axi_ctl_wstrb;
+reg         m_axi_ctl_wlast;
+reg         m_axi_ctl_bready;
+
+reg cfg_rd_144_done_reg;
+reg [3:0] txn_cnt;
+reg txn_done_i;
+wire txn_done_o;
+wire txn_gen;
+(* ASYNC_REG = "TRUE" *) reg [7:0] txn_done_reg;
+  always @(posedge trans_m_axi_ctl_aclk) begin
+    if(!trans_m_axi_ctl_aresetn) begin
+      configs_completed <= #TCQ 1'b0;
+    end else begin
+      if (txn_gen && txn_done_o && (txn_cnt == 4'd14))
+        configs_completed <= #TCQ 1'b1;
+    end
+  end
+
+  always @(posedge trans_m_axi_ctl_aclk) begin
+    if(!trans_m_axi_ctl_aresetn) begin
+      txn_cnt <= #TCQ 4'd0;
+    end else begin
+      if (txn_gen && txn_done_i && (txn_cnt != 4'd14)) begin
+        txn_cnt <= #TCQ txn_cnt + 4'd1;
+      end else begin 
+        txn_cnt <= #TCQ txn_cnt;
+      end
+    end
+  end
+
+  always @(posedge trans_m_axi_ctl_aclk) begin
+    if(!trans_m_axi_ctl_aresetn) begin
+      txn_done_reg <= #TCQ {CY_GAP_BW_TXN{1'b0}};
+    end else begin
+      txn_done_reg <= #TCQ {txn_done_reg[CY_GAP_BW_TXN-2:0],txn_done_i};
+    end
+  end
+
+ assign txn_done_o = txn_done_reg[CY_GAP_BW_TXN-1];
+ assign txn_gen    = cfg_rd_144_done_reg;
+
+  // TXN Generation
+  always @(posedge trans_m_axi_ctl_aclk) begin
+    if(!trans_m_axi_ctl_aresetn) begin
+      m_axi_ctl_awvalid <= #TCQ 'h0; 
+      m_axi_ctl_awaddr  <= #TCQ 'h0; 
+      m_axi_ctl_wvalid  <= #TCQ 'h0; 
+      m_axi_ctl_wdata   <= #TCQ 'h0; 
+      m_axi_ctl_wstrb   <= #TCQ 'h0; 
+      m_axi_ctl_wlast   <= #TCQ 'h0; 
+      m_axi_ctl_bready  <= #TCQ 'h0; 
+      txn_done_i        <= #TCQ 'h0;
+      state             <= #TCQ CFG_TXN_RST;
+    end else begin
+        case (state)
+        
+        CFG_TXN_RST : begin  // Reset_State
+           if (txn_gen && (txn_cnt != 4'd14))
+           state             <= #TCQ CFG_TXN_GEN;
+           else
+           state             <= #TCQ CFG_TXN_RST;
+
+           m_axi_ctl_awvalid <= #TCQ 'h0; 
+           m_axi_ctl_awaddr  <= #TCQ 'h0; 
+           m_axi_ctl_wvalid  <= #TCQ 'h0; 
+           m_axi_ctl_wdata   <= #TCQ 'h0; 
+           m_axi_ctl_wstrb   <= #TCQ 'h0; 
+           m_axi_ctl_wlast   <= #TCQ 'h0; 
+           m_axi_ctl_bready  <= #TCQ 'h0; 
+           txn_done_i        <= #TCQ 'h0;
+        end
+
+        CFG_TXN_GEN : begin  // TXN Generate
+             m_axi_ctl_awvalid <= #TCQ 1'b1; 
+             m_axi_ctl_awaddr  <= #TCQ set_add[txn_cnt];
+
+             m_axi_ctl_wvalid  <= #TCQ 1'b1;
+             m_axi_ctl_wdata   <= #TCQ set_data[txn_cnt];
+             m_axi_ctl_wstrb   <= #TCQ 4'hF;
+             m_axi_ctl_wlast   <= #TCQ 1'b1;
+
+             m_axi_ctl_bready  <= #TCQ 1'b1;
+
+           state             <= #TCQ CFG_TXN_WIT;
+        end
+
+        CFG_TXN_WIT : begin  // TXN WAIT
+           if (trans_m_axi_ctl_awready) begin
+             m_axi_ctl_awvalid <= #TCQ 'h0; 
+             m_axi_ctl_awaddr  <= #TCQ 'h0;
+           end
+
+           if (trans_m_axi_ctl_wready) begin
+             m_axi_ctl_wvalid  <= #TCQ 'h0; 
+             m_axi_ctl_wdata   <= #TCQ 'h0; 
+             m_axi_ctl_wstrb   <= #TCQ 'h0; 
+             m_axi_ctl_wlast   <= #TCQ 'h0; 
+           end
+
+           if (trans_m_axi_ctl_bvalid) begin
+             m_axi_ctl_bready  <= #TCQ 1'b0;
+           end
+
+           if (trans_m_axi_ctl_bvalid) begin
+           state             <= #TCQ CFG_TXN_RST;
+           txn_done_i        <= #TCQ 'h1;
+           end else
+           state             <= #TCQ CFG_TXN_WIT;
+
+        end
+        endcase
+
+    end
+  end
+
+assign trans_m_axi_ctl_awvalid =  m_axi_ctl_awvalid;
+assign trans_m_axi_ctl_awaddr  =  m_axi_ctl_awaddr;
+assign trans_m_axi_ctl_wvalid  =  m_axi_ctl_wvalid;
+assign trans_m_axi_ctl_wdata   =  m_axi_ctl_wdata;
+assign trans_m_axi_ctl_wstrb   =  m_axi_ctl_wstrb;
+assign trans_m_axi_ctl_wlast   =  m_axi_ctl_wlast;
+assign trans_m_axi_ctl_bready  =  m_axi_ctl_bready;
+////////////////////////////////////////////////////////////////////////////////////
+reg [31:0] CFG_READ_DATA;
+reg [3:0] rxn_cnt;
+reg rxn_done_i;
+reg cfg_link_rate;
+reg [5:0] cfg_ltssm_state;
+reg [1:0] cfg_link_width;
+reg cfg_link_up;
+wire cfg_link_width_match;
+wire cfg_rd_144_done;
+
+reg [1:0] configs_completed_i;
+wire cfg_cmpld_pulse;
+
+  always @(posedge trans_m_axi_ctl_aclk) begin
+    if(!trans_m_axi_ctl_aresetn) begin
+      configs_completed_i <= #TCQ 2'b0;
+    end else begin
+      configs_completed_i <= #TCQ {configs_completed_i[0],configs_completed};
+    end
+  end
+
+assign cfg_cmpld_pulse = (~configs_completed_i[1] && configs_completed);
+
+  always @(posedge trans_m_axi_ctl_aclk) begin
+    if(!trans_m_axi_ctl_aresetn) begin
+      rxn_cnt <= #TCQ 4'd0;
+    end else begin
+      rxn_cnt <= #TCQ cfg_rd_144_done_reg ? rxn_cnt : rxn_cnt + 4'd1;
+    end
+  end
+
+  // RXN Generation
+  always @(posedge trans_m_axi_ctl_aclk) begin
+    if(!trans_m_axi_ctl_aresetn) begin
+      trans_m_axi_ctl_arvalid <= #TCQ 'h0;
+      trans_m_axi_ctl_araddr  <= #TCQ  32'h00000144;
+      trans_m_axi_ctl_rready  <= #TCQ 'h1;
+      cfg_link_up             <= #TCQ 'h0; 
+      cfg_link_rate           <= #TCQ 'h0; 
+      cfg_ltssm_state         <= #TCQ 'h0; 
+      cfg_link_width          <= #TCQ 'h0; 
+      rxn_done_i              <= #TCQ 'h0;
+      cfg_rd_144_done_reg     <= #TCQ 'h0;
+      CFG_READ_DATA           <= #TCQ 'h0;
+      rstate                  <= #TCQ CFG_RXN_GEN;
+    end else begin
+        case (rstate)
+        
+        CFG_RXN_GEN : begin  // Reset_State
+           if ((!cfg_rd_144_done_reg && rxn_cnt == 4'b1111) || cfg_cmpld_pulse) begin
+             trans_m_axi_ctl_arvalid <= #TCQ 'h1;
+             rstate                  <= #TCQ CFG_RXN_WIT;
+           end else begin
+             trans_m_axi_ctl_arvalid <= #TCQ 'h0; 
+             rstate                  <= #TCQ CFG_RXN_GEN;
+           end
+           rxn_done_i          <= #TCQ 'h0;
+           cfg_rd_144_done_reg <= #TCQ 'h0;
+        end
+
+        CFG_RXN_WIT : begin  // TXN WAIT
+           if (trans_m_axi_ctl_arready) begin
+             trans_m_axi_ctl_arvalid <= #TCQ 'h0; 
+           end
+
+           if (trans_m_axi_ctl_rvalid) begin
+             rxn_done_i              <= #TCQ 'h1;
+             CFG_READ_DATA           <= #TCQ trans_m_axi_ctl_rdata[31:0];
+             cfg_link_up             <= #TCQ trans_m_axi_ctl_rdata[11];
+             cfg_link_rate           <= #TCQ trans_m_axi_ctl_rdata[0];
+             cfg_link_width          <= #TCQ trans_m_axi_ctl_rdata[2:1];
+             cfg_ltssm_state         <= #TCQ trans_m_axi_ctl_rdata[8:3];
+             rstate                  <= #TCQ CFG_RXN_IDL;
+           end 
+
+        end
+
+        CFG_RXN_IDL : begin  // TXN Generate
+           if (cfg_rd_144_done && ~cfg_cmpld_pulse) begin
+             rstate             <= #TCQ CFG_RXN_IDL;
+             cfg_rd_144_done_reg<= #TCQ 1'b1;
+           end else
+             rstate             <= #TCQ CFG_RXN_GEN;
+
+        end
+
+        endcase
+    end
+  end
+
+assign cfg_link_width_match = (cfg_link_width == 2'b00 && PL_LINK_CAP_MAX_LINK_WIDTH == 1) ||
+                              (cfg_link_width == 2'b01 && PL_LINK_CAP_MAX_LINK_WIDTH == 2) ||
+                              (cfg_link_width == 2'b10 && PL_LINK_CAP_MAX_LINK_WIDTH == 4) ||
+                              (cfg_link_width == 2'b11 && PL_LINK_CAP_MAX_LINK_WIDTH == 8) ;
+
+assign cfg_rd_144_done = (rxn_done_i && (cfg_ltssm_state == 6'h16) && cfg_link_up);
+
+//assign cfg_rd_144_done = (rxn_done_i && (cfg_ltssm_state == 6'h16) && cfg_link_up && ((!cfg_link_rate && (PL_LINK_CAP_MAX_LINK_SPEED == 1)) || (cfg_link_rate && (PL_LINK_CAP_MAX_LINK_SPEED == 2))) && 
+//                          cfg_link_width_match);
+assign user_link_up = cfg_rd_144_done_reg;
+////////////////////////////////////////////////////////////////////////////////////
+
+endmodule

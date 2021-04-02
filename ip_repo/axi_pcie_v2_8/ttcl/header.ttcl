@@ -1,0 +1,57 @@
+<: set headerFileName [getFileName] :>
+<: set headerFileExtension [getFileExtension] :>
+<: set commentString "##" :>
+<: if {([string equal $headerFileExtension ".v"]) || ([string equal $headerFileExtension ".vh"]) || ([string equal $headerFileExtension "veo"]) || ([string equal $headerFileExtension ".data"])} {set commentString "//";} :>
+<: if {([string equal $headerFileExtension ".vhd"]) || ([string equal $headerFileExtension ".vho"])} {set commentString "--";} :>
+<=: commentString :>-----------------------------------------------------------------------------
+<=: commentString :>
+<=: commentString :> (c) Copyright 2010-2011 Xilinx, Inc. All rights reserved.
+<=: commentString :>
+<=: commentString :> This file contains confidential and proprietary information
+<=: commentString :> of Xilinx, Inc. and is protected under U.S. and
+<=: commentString :> international copyright and other intellectual property
+<=: commentString :> laws.
+<=: commentString :>
+<=: commentString :> DISCLAIMER
+<=: commentString :> This disclaimer is not a license and does not grant any
+<=: commentString :> rights to the materials distributed herewith. Except as
+<=: commentString :> otherwise provided in a valid license issued to you by
+<=: commentString :> Xilinx, and to the maximum extent permitted by applicable
+<=: commentString :> law: (1) THESE MATERIALS ARE MADE AVAILABLE "AS IS" AND
+<=: commentString :> WITH ALL FAULTS, AND XILINX HEREBY DISCLAIMS ALL WARRANTIES
+<=: commentString :> AND CONDITIONS, EXPRESS, IMPLIED, OR STATUTORY, INCLUDING
+<=: commentString :> BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, NON-
+<=: commentString :> INFRINGEMENT, OR FITNESS FOR ANY PARTICULAR PURPOSE; and
+<=: commentString :> (2) Xilinx shall not be liable (whether in contract or tort,
+<=: commentString :> including negligence, or under any other theory of
+<=: commentString :> liability) for any loss or damage of any kind or nature
+<=: commentString :> related to, arising under or in connection with these
+<=: commentString :> materials, including for any direct, or any indirect,
+<=: commentString :> special, incidental, or consequential loss or damage
+<=: commentString :> (including loss of data, profits, goodwill, or any type of
+<=: commentString :> loss or damage suffered as a result of any action brought
+<=: commentString :> by a third party) even if such damage or loss was
+<=: commentString :> reasonably foreseeable or Xilinx had been advised of the
+<=: commentString :> possibility of the same.
+<=: commentString :>
+<=: commentString :> CRITICAL APPLICATIONS
+<=: commentString :> Xilinx products are not designed or intended to be fail-
+<=: commentString :> safe, or for use in any application requiring fail-safe
+<=: commentString :> performance, such as life-support or safety devices or
+<=: commentString :> systems, Class III medical devices, nuclear facilities,
+<=: commentString :> applications related to the deployment of airbags, or any
+<=: commentString :> other applications that could lead to death, personal
+<=: commentString :> injury, or severe property or environmental damage
+<=: commentString :> (individually and collectively, "Critical
+<=: commentString :> Applications"). Customer assumes the sole risk and
+<=: commentString :> liability of any use of Xilinx products in Critical
+<=: commentString :> Applications, subject only to applicable laws and
+<=: commentString :> regulations governing limitations on product liability.
+<=: commentString :>
+<=: commentString :> THIS COPYRIGHT NOTICE AND DISCLAIMER MUST BE RETAINED AS
+<=: commentString :> PART OF THIS FILE AT ALL TIMES.
+<=: commentString :>
+<=: commentString :>-----------------------------------------------------------------------------
+<=: commentString :> Project    : AXI Memory Mapped Bridge to PCI Express
+<=: commentString :> File       : <=: headerFileName :><=: headerFileExtension :>
+<=: commentString :> Version    : 2.8

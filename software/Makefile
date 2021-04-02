@@ -4,13 +4,13 @@
 # Description: Sample software for XPDMA driver test
 
 NAME := test_xpdma
-C_SRCS := $(wildcard *.c)
+C_SRCS := $(NAME).c
 CXX_SRCS := $(wildcard *.cpp)
 C_OBJS := ${C_SRCS:.c=.o}
 CXX_OBJS := ${CXX_SRCS:.cpp=.o}
 OBJS := $(C_OBJS) $(CXX_OBJS)
-INCLUDE_DIRS := ../driver
-LIBRARY_DIRS := ../driver
+INCLUDE_DIRS := ../driver .
+LIBRARY_DIRS := ../driver .
 LIBRARIES := xpdma
 CPPFLAGS += -g
 

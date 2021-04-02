@@ -1,0 +1,7 @@
+<#: ttcl/GetValueSimParam.ttcl :>
+<: if {$ep} ttcl_return :>
+<: setFileName "PIO_TX_ENGINE" :>
+<: setFileExtension ".v" :>
+<: setOutputDirectory [ttcl_string_concat $ComponentName "/simulation/ep"] :>
+<#: ttcl/header.ttcl :>
+<#: ttcl/PIO_TX_ENGINE_vlog.ttcl :>

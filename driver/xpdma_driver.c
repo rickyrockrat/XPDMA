@@ -12,6 +12,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/fs.h>
 #include <linux/cdev.h>
+#include <linux/slab.h>
 #include "xpdma_driver.h"
 
 MODULE_LICENSE("Dual BSD/GPL");
@@ -40,7 +41,7 @@ MODULE_AUTHOR("Strezhik Iurii");
 #define AXI_PCIE_DM_ADDR    0x80000000   // AXI:BAR1 Address
 #define AXI_PCIE_SG_ADDR    0x80800000   // AXI:BAR0 Address
 #define AXI_BRAM_ADDR       0x81000000   // AXI Translation BRAM Address
-#define AXI_DDR3_ADDR       0x00000000   // AXI DDR3 Address
+#define AXI_DDR3_ADDR       0x40000000   // AXI DDR3 Address
 
 #define SG_COMPLETE_MASK    0xF0000000   // Scatter Gather Operation Complete status flag mask
 #define SG_DEC_ERR_MASK     0x40000000   // Scatter Gather Operation Decode Error flag mask
@@ -60,6 +61,8 @@ MODULE_AUTHOR("Strezhik Iurii");
 
 #define CDMA_RESET_LOOP	    1000000      // Reset timeout counter limit
 #define SG_TRANSFER_LOOP    1000000      // Scatter Gather Transfer timeout counter limit
+
+
 
 // Scatter Gather Transfer descriptor
 typedef struct {
@@ -130,8 +133,8 @@ int xpdma_open(struct inode *inode, struct file *filp);
 int xpdma_release(struct inode *inode, struct file *filp);
 static inline u32 xpdma_readReg (int id, u32 reg);
 static inline void xpdma_writeReg (int id, u32 reg, u32 val);
-ssize_t xpdma_send (int id, void *data, size_t count, u32 addr);
-ssize_t xpdma_recv (int id, void *data, size_t count, u32 addr);
+ssize_t xpdma_send (int id, void *data, size_t count, u32 addr, int mem_type);
+ssize_t xpdma_recv (int id, void *data, size_t count, u32 addr, int mem_type);
 void xpdma_showInfo (int id);
 
 // Aliasing write, read, ioctl, etc...
@@ -230,7 +233,7 @@ long xpdma_ioctl (struct file *filp, unsigned int cmd, unsigned long arg)
 //             printk(KERN_INFO"%s: FPGA %d\n", DEVICE_NAME, (*(cdmaBuffer_t *)arg).id);
 //             printk(KERN_INFO"%s: Send Data size 0x%X\n", DEVICE_NAME, (*(cdmaBuffer_t *)arg).count);
 //             printk(KERN_INFO"%s: Send Data address 0x%X\n", DEVICE_NAME, (*(cdmaBuffer_t *)arg).addr);
-            result = xpdma_send ((*(cdmaBuffer_t *)arg).id, (*(cdmaBuffer_t *)arg).data, (*(cdmaBuffer_t *)arg).count, (*(cdmaBuffer_t *)arg).addr);
+            result = xpdma_send ((*(cdmaBuffer_t *)arg).id, (*(cdmaBuffer_t *)arg).data, (*(cdmaBuffer_t *)arg).count, (*(cdmaBuffer_t *)arg).addr,(*(cdmaBuffer_t *)arg).mem_type);
 //             printk(KERN_INFO"%s: Sended\n", DEVICE_NAME);
             break;
         case IOCTL_RECV:
@@ -238,7 +241,7 @@ long xpdma_ioctl (struct file *filp, unsigned int cmd, unsigned long arg)
 //             printk(KERN_INFO"%s: FPGA %d\n", DEVICE_NAME, (*(cdmaBuffer_t *)arg).id);
 //             printk(KERN_INFO"%s: Receive Data size 0x%X\n", DEVICE_NAME, (*(cdmaBuffer_t *)arg).count);
 //             printk(KERN_INFO"%s: Receive Data address 0x%X\n", DEVICE_NAME, (*(cdmaBuffer_t *)arg).addr);
-            result = xpdma_recv ((*(cdmaBuffer_t *)arg).id, (*(cdmaBuffer_t *)arg).data, (*(cdmaBuffer_t *)arg).count, (*(cdmaBuffer_t *)arg).addr);
+            result = xpdma_recv ((*(cdmaBuffer_t *)arg).id, (*(cdmaBuffer_t *)arg).data, (*(cdmaBuffer_t *)arg).count, (*(cdmaBuffer_t *)arg).addr,(*(cdmaBuffer_t *)arg).mem_type);
 //             printk(KERN_INFO"%s: Received\n", DEVICE_NAME);
             break;
         case IOCTL_INFO:
@@ -561,48 +564,102 @@ static int sg_operation(int id, int direction, size_t count, u32 addr)
     return (CRIT_ERR);
 }
 
-static int sg_block(int id, int direction, void *data, size_t count, u32 addr)
+static int sg_block(int id, int direction, void *data, size_t count, u32 addr, int mem_type)
 {
     size_t unsended = count;
     char *curData = data;
+	char *wr, *rd;
+	dma_addr_t wh, rh;
     u32 curAddr = addr;
     u32 btt = BUF_SIZE;
-
+	int wonce=0, ronce=0 ;
+	
     if ( (addr % 4) != 0 )  {
         printk(KERN_WARNING"%s: Scatter Gather: Address %08X not dword aligned.\n", DEVICE_NAME, addr);
         return (CRIT_ERR);
     }
-
+    if(MEM_TYPE_KERN == mem_type){ /**save the allocated buffers - we will use as-is.  */
+		wr=xpdmas[id].writeBuffer;
+		rd=xpdmas[id].readBuffer;
+		wh=xpdmas[id].writeHWAddr;
+		rh=xpdmas[id].readHWAddr;
+	}	
     // divide block
     while (unsended) {
         btt = (unsended < BUF_SIZE) ? unsended : BUF_SIZE;
 //        printk(KERN_INFO"%s: SG Block: BTT=%u\tunsended=%lu \n", DEVICE_NAME, btt, unsended);
 
         // TODO: remove this multiple checks
-        if (PCI_DMA_TODEVICE == direction)
-            if ( copy_from_user(xpdmas[id].writeBuffer, curData, btt) )  {
-                printk(KERN_WARNING"%s: sg_block: Failed copy from user.\n", DEVICE_NAME);
-                return (CRIT_ERR);
-            }
+        if (PCI_DMA_TODEVICE == direction){
+			if(MEM_TYPE_USER == mem_type){
+				if(!wonce){
+					++wonce;
+					printk(KERN_INFO"Using Write data address as %p->(@%p)\n",curData,xpdmas[id].writeBuffer);
+				}	
+				if ( copy_from_user(xpdmas[id].writeBuffer, curData, btt) )  {
+	                printk(KERN_WARNING"%s: sg_block: Failed copy from user.\n", DEVICE_NAME);
+	                return (CRIT_ERR);
+	            }	
+			}else {
+				/**set up buffers before operation.  */
+				xpdmas[id].writeBuffer=bus_to_virt((unsigned long long)curData);
+				xpdmas[id].writeHWAddr=(dma_addr_t)curData;
+				if(!wonce){
+					int i;
+					printk(KERN_INFO"Using Write data address as is %p (@%p)\n",curData,xpdmas[id].writeBuffer);
+					++wonce;
+					for (i=0; i<0x16; ++i)
+						printk(KERN_INFO"%02X ",xpdmas[id].writeBuffer[i]);
+					printk(KERN_INFO"\n");
+				}
+				
+			}
+		}else if(MEM_TYPE_KERN == mem_type){
+			xpdmas[id].readBuffer=bus_to_virt((unsigned long long)curData);
+			xpdmas[id].readHWAddr=(dma_addr_t)curData;
+		}	
 
         sg_operation(id, direction, btt, curAddr);
 
         // TODO: remove this multiple checks
-        if (PCI_DMA_FROMDEVICE == direction)
-            if ( copy_to_user(curData, xpdmas[id].readBuffer, btt) )  {
-                printk("%s: sg_block: Failed copy to user.\n", DEVICE_NAME);
-                return (CRIT_ERR);
-            }
+        if (PCI_DMA_FROMDEVICE == direction){
+			if(MEM_TYPE_USER == mem_type){
+				if(!ronce){
+					printk(KERN_INFO"Using Read data address as %p<-(@%p)\n",curData,xpdmas[id].readBuffer);
+					++ronce;
+				}	
+	            if ( copy_to_user(curData, xpdmas[id].readBuffer, btt) )  {
+	                printk("%s: sg_block: Failed copy to user.\n", DEVICE_NAME);
+	                return (CRIT_ERR);
+	            }
+			}else{
+				if(!ronce){
+					int i;
+					printk(KERN_INFO"Using Read data address as is %p (@%p)\n",curData,xpdmas[id].readBuffer);
+					for (i=0; i<0x16; ++i)
+						printk(KERN_INFO"%02X ",xpdmas[id].readBuffer[i]);
+					printk(KERN_INFO"\n");
+					++ronce;
+				}
+				/*curData=xpdmas[id].readBuffer; */
+			}
+		}
+        	
 
         curData += BUF_SIZE;
         curAddr += BUF_SIZE;
         unsended -= btt;
     }
-
+    if(MEM_TYPE_KERN == mem_type){
+		xpdmas[id].writeBuffer=wr;
+		xpdmas[id].readBuffer=rd;
+		xpdmas[id].writeHWAddr=wh;
+		xpdmas[id].readHWAddr=rh;
+	}
     return (SUCCESS);
 }
 
-ssize_t xpdma_send (int id, void *data, size_t count, u32 addr)
+ssize_t xpdma_send (int id, void *data, size_t count, u32 addr, int mem_type)
 {
     if (!xpdmas[id].used) {
         printk(KERN_WARNING"%s: FPGA %d don't initialized!\n", DEVICE_NAME, id);
@@ -610,13 +667,13 @@ ssize_t xpdma_send (int id, void *data, size_t count, u32 addr)
     }
 
     //down(&gSemDma);
-    sg_block(id, PCI_DMA_TODEVICE, (void *)data, count, addr);
+    sg_block(id, PCI_DMA_TODEVICE, (void *)data, count, addr, mem_type);
     //up(&gSemDma);
 
     return (SUCCESS);
 }
 
-ssize_t xpdma_recv (int id, void *data, size_t count, u32 addr)
+ssize_t xpdma_recv (int id, void *data, size_t count, u32 addr, int mem_type)
 {
     if (!xpdmas[id].used) {
         printk(KERN_WARNING"%s: FPGA %d don't initialized!\n", DEVICE_NAME, id);
@@ -624,7 +681,7 @@ ssize_t xpdma_recv (int id, void *data, size_t count, u32 addr)
     }
 
     //down(&gSemDma);
-    sg_block(id, PCI_DMA_FROMDEVICE, (void *)data, count, addr);
+    sg_block(id, PCI_DMA_FROMDEVICE, (void *)data, count, addr, mem_type);
     //up(&gSemDma);
 
     return (SUCCESS);
@@ -740,6 +797,43 @@ static int xpdma_getResource(int id)
     return (SUCCESS);
 }
 
+static void xpdma_free_board(int id)
+{
+	if (xpdmas[id].used) {
+           // Check if we have a memory region and free it
+           if (xpdmas[id].statFlags & HAVE_MEM_REGION) {
+               release_mem_region(xpdmas[id].baseHdwr, xpdmas[id].baseLen);
+           }
+
+//             printk(KERN_INFO"%s: xpdma_exit: erase xpdmas[id].readBuffer\n", DEVICE_NAME);
+           // Free Write, Read and Descriptor buffers allocated to use
+           if (NULL != xpdmas[id].readBuffer)
+               dma_free_coherent( &xpdmas[id].dev->dev, BUF_SIZE, xpdmas[id].readBuffer, xpdmas[id].readHWAddr);
+
+//             printk(KERN_INFO"%s: xpdma_exit: erase xpdmas[id].writeBuffer\n", DEVICE_NAME);
+           if (NULL != xpdmas[id].writeBuffer)
+               dma_free_coherent( &xpdmas[id].dev->dev, BUF_SIZE, xpdmas[id].writeBuffer, xpdmas[id].writeHWAddr);
+
+//             printk(KERN_INFO"%s: xpdma_exit: erase xpdmas[id].descChain\n", DEVICE_NAME);
+           if (NULL != xpdmas[id].writeBuffer)
+               dma_free_coherent( &xpdmas[id].dev->dev, BUF_SIZE, xpdmas[id].descChain, xpdmas[id].descChainHWAddr);
+
+           xpdmas[id].readBuffer = NULL;
+           xpdmas[id].writeBuffer = NULL;
+           xpdmas[id].descChain = NULL;
+
+           // Unmap virtual device address
+//             printk(KERN_INFO"%s: xpdma_exit: unmap xpdmas[id].baseVirt\n", DEVICE_NAME);
+           if (xpdmas[id].baseVirt != NULL)
+               iounmap(xpdmas[id].baseVirt);
+
+           xpdmas[id].baseVirt = NULL;
+
+           xpdmas[id].statFlags = 0;
+           xpdmas[id].used = 0;
+       }
+}
+
 static int xpdma_init (void)
 {
     int c = 0;
@@ -754,7 +848,7 @@ static int xpdma_init (void)
         xpdmas[c].writeBuffer = NULL;
     }
 
-    printk(KERN_INFO"%s: Init: try to found boards\n", DEVICE_NAME);
+    printk(KERN_INFO"%s: Init: try to find boards\n", DEVICE_NAME);
 
     for (c = 0; c < XPDMA_NUM_MAX; ++c) {
         xpdmas[c].dev = pci_get_device(VENDOR_ID, DEVICE_ID, (c > 0) ? xpdmas[c-1].dev: NULL);
@@ -763,14 +857,14 @@ static int xpdma_init (void)
             if (xpdma_getResource(c) == SUCCESS)
                 xpdmas[c].used = 1;
             else
-                printk(KERN_WARNING"%s: Init: board %d don't get resources!\n", DEVICE_NAME, c);
+                printk(KERN_WARNING"%s: Init: Unable to get resources for board %d\n", DEVICE_NAME, c);
         } else {
-            printk(KERN_INFO"%s: Init: not found board %d\n", DEVICE_NAME, c);
+            printk(KERN_INFO"%s: Init: Cannot find board %d\n", DEVICE_NAME, c);
             break;
         }
     }
 
-    printk(KERN_INFO"%s: Init: finish found boards\n", DEVICE_NAME);
+    printk(KERN_INFO"%s: Init: found %d boards\n", DEVICE_NAME, c);
 
     // Register driver as a character device.
     //if (0 > register_chrdev(gDrvrMajor, DEVICE_NAME, &xpdma_intf)) {
@@ -820,12 +914,15 @@ static int xpdma_init (void)
 
     gKernelRegFlag |= HAVE_KERNEL_REG;
     printk(KERN_INFO"%s: Init: driver is loaded\n", DEVICE_NAME);
+	
+	xpdma_showInfo(0);
 
     for (c = 0; c < XPDMA_NUM_MAX; ++c) {
         if (xpdmas[c].used) {
             // try to reset CDMA
             if (xpdma_reset(c)) {
                 printk(KERN_WARNING"%s: Init: RESET timeout\n", DEVICE_NAME);
+				xpdma_free_board(c);
                 return (CRIT_ERR);
             }
         }
@@ -841,39 +938,7 @@ static void xpdma_exit (void)
 
 //     printk(KERN_INFO"%s: Exit: unload module resources\n", DEVICE_NAME);
     for (id = 0; id < XPDMA_NUM_MAX; ++id) {
-        if (xpdmas[id].used) {
-            // Check if we have a memory region and free it
-            if (xpdmas[id].statFlags & HAVE_MEM_REGION) {
-                release_mem_region(xpdmas[id].baseHdwr, xpdmas[id].baseLen);
-            }
-
-//             printk(KERN_INFO"%s: xpdma_exit: erase xpdmas[id].readBuffer\n", DEVICE_NAME);
-            // Free Write, Read and Descriptor buffers allocated to use
-            if (NULL != xpdmas[id].readBuffer)
-                dma_free_coherent( &xpdmas[id].dev->dev, BUF_SIZE, xpdmas[id].readBuffer, xpdmas[id].readHWAddr);
-
-//             printk(KERN_INFO"%s: xpdma_exit: erase xpdmas[id].writeBuffer\n", DEVICE_NAME);
-            if (NULL != xpdmas[id].writeBuffer)
-                dma_free_coherent( &xpdmas[id].dev->dev, BUF_SIZE, xpdmas[id].writeBuffer, xpdmas[id].writeHWAddr);
-
-//             printk(KERN_INFO"%s: xpdma_exit: erase xpdmas[id].descChain\n", DEVICE_NAME);
-            if (NULL != xpdmas[id].descChain)
-                dma_free_coherent( &xpdmas[id].dev->dev, BUF_SIZE, xpdmas[id].descChain, xpdmas[id].descChainHWAddr);
-
-            xpdmas[id].readBuffer = NULL;
-            xpdmas[id].writeBuffer = NULL;
-            xpdmas[id].descChain = NULL;
-
-            // Unmap virtual device address
-//             printk(KERN_INFO"%s: xpdma_exit: unmap xpdmas[id].baseVirt\n", DEVICE_NAME);
-            if (xpdmas[id].baseVirt != NULL)
-                iounmap(xpdmas[id].baseVirt);
-
-            xpdmas[id].baseVirt = NULL;
-
-            xpdmas[id].statFlags = 0;
-            xpdmas[id].used = 0;
-        }
+        xpdma_free_board(id);
     }
     // Unregister Device Driver
 

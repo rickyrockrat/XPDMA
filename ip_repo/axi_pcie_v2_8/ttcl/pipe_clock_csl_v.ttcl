@@ -1,0 +1,8 @@
+<#: ttcl/GetValueSimParam.ttcl :>
+<: if {$gen_ies_gt_wrappers} ttcl_return :>
+<: if {($pcie_ext_clk_string == "FALSE")} ttcl_return :>
+<: setFileName "axi_pcie_v2_8_0_pcie_7x_v2_0_2_pipe_clock" :>
+<: setFileExtension ".v" :>
+<: setOutputDirectory [ttcl_string_concat $ComponentName "/example_design/support"] :>
+<#: ttcl/header.ttcl :>
+<#: ttcl/pipe_clock_vlog.ttcl :>

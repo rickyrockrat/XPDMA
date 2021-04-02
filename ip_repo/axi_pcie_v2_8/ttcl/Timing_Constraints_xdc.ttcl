@@ -1,0 +1,36 @@
+
+<: ;#Set a false path through the select line of the BUFGMUX. :>
+#
+set_false_path -to [get_pins {<=: pipe_clk_path :>pipe_clock_i/pclk_i1_bufgctrl.pclk_i1/S*}]
+#
+<: if {$x1g1 || $x2g1 || $x4g1 || $x8g1} { :>
+#
+set_case_analysis 1 [get_pins {<=: pipe_clk_path :>pipe_clock_i/pclk_i1_bufgctrl.pclk_i1/S0}]
+set_case_analysis 0 [get_pins {<=: pipe_clk_path :>pipe_clock_i/pclk_i1_bufgctrl.pclk_i1/S1}]
+#
+set_property DONT_TOUCH TRUE [get_cells -of [get_nets -of [get_pins {<=: pipe_clk_path :>pipe_clock_i/pclk_i1_bufgctrl.pclk_i1/S0}]]]
+#
+<: } else { :>
+#The following constraints are used to constrain the output of the BUFGMUX.
+#This constraint is set for 250MHz because when the PCIe core is operating in Gen2
+#mode, the 250MHz clock is selected.  Without these constraints, it is possible that
+#static timing analysis could anayze the design using the 125MHz clock instead of the
+#250MHz clock.
+#
+#
+create_generated_clock -name clk_125mhz_mux_<=: print $pcie_blk :> \
+                        -source [get_pins <=: pipe_clk_path :>pipe_clock_i/pclk_i1_bufgctrl.pclk_i1/I0] \
+                        -divide_by 1 \
+                        [get_pins <=: pipe_clk_path :>pipe_clock_i/pclk_i1_bufgctrl.pclk_i1/O]
+#
+create_generated_clock -name clk_250mhz_mux_<=: print $pcie_blk :> \
+                        -source \
+                        [get_pins <=: pipe_clk_path :>pipe_clock_i/pclk_i1_bufgctrl.pclk_i1/I1] \
+                        -divide_by 1 -add \
+                        -master_clock \
+                        [get_clocks -of [get_pins <=: pipe_clk_path :>pipe_clock_i/pclk_i1_bufgctrl.pclk_i1/I1]] \
+                        [get_pins <=: pipe_clk_path :>pipe_clock_i/pclk_i1_bufgctrl.pclk_i1/O]
+#
+set_clock_groups -name pcieclkmux -physically_exclusive -group clk_125mhz_mux_<=: print $pcie_blk :> -group clk_250mhz_mux_<=: print $pcie_blk :>
+#
+<: } :>

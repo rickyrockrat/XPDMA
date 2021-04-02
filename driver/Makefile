@@ -7,7 +7,7 @@ NAME := xpdma
 
 # Build variables
 KERNEL_VER := $(shell uname -r)
-KERNEL_DIR := /lib/modules/$(KERNEL_VER)/build
+KERNEL_DIR ?= /lib/modules/$(KERNEL_VER)/build
 
 LIB_SRCS := xpdma.c
 LIB_OBJS := $(patsubst %.c,%.o,$(LIB_SRCS))

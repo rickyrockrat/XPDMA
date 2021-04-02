@@ -20,6 +20,7 @@ typedef struct {
 // Struct Used for send/receive data
 typedef struct {
     int id;
+	int mem_type;
     void *data;
     uint32_t count;
     uint32_t addr;
@@ -39,5 +40,9 @@ enum {
     IOCTL_RECV,      // Receive data from AXI CDMA to Host system
     IOCTL_INFO,      // Show debug information
 };
+
+#define MEM_TYPE_USER		0            //Use copy to/from user
+#define MEM_TYPE_KERN		1            //Already in kernel space.
+
 
 #endif //XPDMA_DRIVER_H

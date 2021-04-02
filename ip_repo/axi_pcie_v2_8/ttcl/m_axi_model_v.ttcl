@@ -1,0 +1,380 @@
+<#: ttcl/GetValueSimParam.ttcl :>
+<: if {$ep} ttcl_return :>
+<: setFileName  "m_axi_model" :>
+<: setFileExtension ".v" :>
+<: setOutputDirectory [ttcl_string_concat $ComponentName "/example_design"] :>
+<#: ttcl/header.ttcl :>
+//-----------------------------------------------------------------------------
+`timescale 1ns/1ns
+
+module m_axi_model #(
+  parameter PL_LINK_CAP_MAX_LINK_SPEED = 1, 
+  parameter PL_LINK_CAP_MAX_LINK_WIDTH = 1,
+  parameter NO_OF_MEM_TXN = 1,
+  parameter CY_GAP_BW_TXN = 8
+) (
+    //--------------------------------------------------------------
+    // Clock & Reset
+    input   wire                trans_m_axi_aclk,
+    input   wire                trans_m_axi_aresetn,
+    input   wire                user_link_up,
+    input   wire                configs_completed,
+    output  reg                 pio_test_completed,
+    output  reg                 pio_test_failed,
+    //--------------------------------------------------------------
+    // AXI Read
+    input   wire                trans_m_axi_arready,
+    output  reg                trans_m_axi_arvalid,
+    output  reg  [ 31:  0]     trans_m_axi_araddr,
+    output  reg  [  7:  0]     trans_m_axi_arlen,
+    output  reg  [  2:  0]     trans_m_axi_arsize,
+    output  reg  [  1:  0]     trans_m_axi_arburst,
+    output  reg  [  2:  0]     trans_m_axi_arprot,
+    output  reg  [  3:  0]     trans_m_axi_arcache,
+    output  reg  [  1:  0]     trans_m_axi_arlock,
+
+    output  reg                 trans_m_axi_rready,
+    input   wire                trans_m_axi_rvalid,
+    input   wire  [(<=: print $pcie_axi_if_wdt_int :>-1):  0]  trans_m_axi_rdata,
+    input   wire  [  1:  0]     trans_m_axi_rresp,
+    input   wire                trans_m_axi_rlast,
+
+    //--------------------------------------------------------------
+    // AXI Write
+    input   wire                  trans_m_axi_awready,
+    output  reg                  trans_m_axi_awvalid,
+    output  reg  [ 31:  0]       trans_m_axi_awaddr,
+    output  reg  [  7:  0]       trans_m_axi_awlen,
+    output  reg  [  2:  0]       trans_m_axi_awsize,
+    output  reg  [  1:  0]       trans_m_axi_awburst,
+    output  reg  [  2:  0]       trans_m_axi_awprot,
+    output  reg  [  3:  0]       trans_m_axi_awcache,
+    output  reg  [  1:  0]       trans_m_axi_awlock,
+    input   wire                  trans_m_axi_wready,
+    output  reg                  trans_m_axi_wvalid,
+    output  reg  [(<=: print $pcie_axi_if_wdt_int :>-1):  0]   trans_m_axi_wdata,
+    output  reg  [(<=: print $pcie_axi_if_wdt_int :>/8)-1:  0] trans_m_axi_wstrb,
+    output  reg                  trans_m_axi_wlast,
+    output  reg                  trans_m_axi_bready,
+    input   wire                  trans_m_axi_bvalid,
+    input   wire  [  1:  0]       trans_m_axi_bresp
+          
+);
+
+  localparam                                  TCQ = 1;
+
+localparam MEM_TXN_GEN = 2'b00;
+localparam MEM_MEW_WIT = 2'b01;
+localparam MEM_MER_WIT = 2'b10;
+localparam MEM_TXN_IDL = 2'b11;
+wire [3:0] spwd;
+assign spwd =  PL_LINK_CAP_MAX_LINK_SPEED == 1 ? (PL_LINK_CAP_MAX_LINK_WIDTH == 1 ? 4'h0 : (PL_LINK_CAP_MAX_LINK_WIDTH == 2 ? 4'h1 : (PL_LINK_CAP_MAX_LINK_WIDTH == 4 ? 4'h2 : 4'h3))) :
+              (PL_LINK_CAP_MAX_LINK_SPEED == 2 ? (PL_LINK_CAP_MAX_LINK_WIDTH == 1 ? 4'h4 : (PL_LINK_CAP_MAX_LINK_WIDTH == 2 ? 4'h5 : (PL_LINK_CAP_MAX_LINK_WIDTH == 4 ? 4'h6 : 4'h7))) :
+              (PL_LINK_CAP_MAX_LINK_SPEED == 4 ? (PL_LINK_CAP_MAX_LINK_WIDTH == 1 ? 4'h8 : (PL_LINK_CAP_MAX_LINK_WIDTH == 2 ? 4'h9 : (PL_LINK_CAP_MAX_LINK_WIDTH == 4 ? 4'ha : 4'hb))) : 
+              4'hf));
+
+reg [31:0] WRITE_DATA;
+reg [31:0] READ_DATA;
+
+reg [1:0] state;
+reg [31:0] set_add[0:15];
+reg [31:0] set_data[0:15];
+
+  always @(posedge trans_m_axi_aclk) begin
+    if(!trans_m_axi_aresetn) begin
+      set_add[0]  <= #TCQ {32{1'b0}};  
+      set_add[1]  <= #TCQ {32{1'b0}};
+      set_add[2]  <= #TCQ {32{1'b0}};
+      set_add[3]  <= #TCQ {32{1'b0}};
+      set_add[4]  <= #TCQ {32{1'b0}};
+      set_add[5]  <= #TCQ {32{1'b0}};
+      set_add[6]  <= #TCQ {32{1'b0}};
+      set_add[7]  <= #TCQ {32{1'b0}};
+      set_add[8]  <= #TCQ {32{1'b0}};
+      set_add[9]  <= #TCQ {32{1'b0}};
+      set_add[10] <= #TCQ {32{1'b0}};
+      set_add[11] <= #TCQ {32{1'b0}};
+      set_add[12] <= #TCQ {32{1'b0}};
+      set_add[13] <= #TCQ {32{1'b0}};
+      set_add[14] <= #TCQ {32{1'b0}};
+      set_add[15] <= #TCQ {32{1'b0}};
+    end else begin
+      set_add[0]  <= #TCQ 32'h40000000;  
+      set_add[1]  <= #TCQ 32'h40000010;
+      set_add[2]  <= #TCQ 32'h40000020;
+      set_add[3]  <= #TCQ 32'h40000030;
+      set_add[4]  <= #TCQ 32'h40000040;
+      set_add[5]  <= #TCQ 32'h40000050;
+      set_add[6]  <= #TCQ 32'h40000060;
+      set_add[7]  <= #TCQ 32'h40000070;
+      set_add[8]  <= #TCQ 32'h40000008;
+      set_add[9]  <= #TCQ 32'h40000090;
+      set_add[10] <= #TCQ 32'h4000000A;
+      set_add[11] <= #TCQ 32'h400000B0;
+      set_add[12] <= #TCQ 32'h400000C0;
+      set_add[13] <= #TCQ 32'h400000D0;
+      set_add[14] <= #TCQ 32'h400000E0;
+      set_add[15] <= #TCQ 32'h400000F0;
+    end
+  end
+
+  always @(posedge trans_m_axi_aclk) begin
+    if(!trans_m_axi_aresetn) begin
+      set_data[0]  <= #TCQ {32{1'b0}};  
+      set_data[1]  <= #TCQ {32{1'b0}};
+      set_data[2]  <= #TCQ {32{1'b0}};
+      set_data[3]  <= #TCQ {32{1'b0}};
+      set_data[4]  <= #TCQ {32{1'b0}};
+      set_data[5]  <= #TCQ {32{1'b0}};
+      set_data[6]  <= #TCQ {32{1'b0}};
+      set_data[7]  <= #TCQ {32{1'b0}};
+      set_data[8]  <= #TCQ {32{1'b0}};
+      set_data[9]  <= #TCQ {32{1'b0}};
+      set_data[10] <= #TCQ {32{1'b0}};
+      set_data[11] <= #TCQ {32{1'b0}};
+      set_data[12] <= #TCQ {32{1'b0}};
+      set_data[13] <= #TCQ {32{1'b0}};
+      set_data[14] <= #TCQ {32{1'b0}};
+      set_data[15] <= #TCQ {32{1'b0}};
+    end else begin
+      set_data[0]  <= #TCQ 32'hA1A1A1A1;  
+      set_data[1]  <= #TCQ 32'hA2A2A2A2;
+      set_data[2]  <= #TCQ 32'hA4A4A4A4;
+      set_data[3]  <= #TCQ 32'hA8A8A8A8;
+      set_data[4]  <= #TCQ 32'hB1B1B1B1;
+      set_data[5]  <= #TCQ 32'hB2B2B2B2;
+      set_data[6]  <= #TCQ 32'hB4B4B4B4;
+      set_data[7]  <= #TCQ 32'hB8B8B8B8;
+      set_data[8]  <= #TCQ 32'hC1C1C1C1;
+      set_data[9]  <= #TCQ 32'hC2C2C2C2;
+      set_data[10] <= #TCQ 32'hC4C4C4C4;
+      set_data[11] <= #TCQ 32'hC8C8C8C8;
+      set_data[12] <= #TCQ 32'hDEAD1111;
+      set_data[13] <= #TCQ 32'hDEAD2222;
+      set_data[14] <= #TCQ 32'hDEAD3333;
+      set_data[15] <= #TCQ 32'hDEAD4444;
+    end
+  end
+(* ASYNC_REG = "TRUE" *) reg [7:0] txn_done_reg;
+reg [7:0] rxn_done_reg; 
+reg txn_done_i;
+reg rxn_done_i;
+wire txn_done_o;
+wire rxn_done_o;
+wire txn_gen;
+wire rxn_gen;
+
+  always @(posedge trans_m_axi_aclk) begin
+    if(!trans_m_axi_aresetn) begin
+      txn_done_reg <= #TCQ {CY_GAP_BW_TXN{1'b0}};
+      rxn_done_reg <= #TCQ {CY_GAP_BW_TXN{1'b0}};
+    end else begin
+      txn_done_reg <= #TCQ {txn_done_reg[CY_GAP_BW_TXN-2:0],txn_done_i};
+      rxn_done_reg <= #TCQ {rxn_done_reg[CY_GAP_BW_TXN-2:0],rxn_done_i};
+    end
+  end
+
+ assign txn_done_o = txn_done_reg[CY_GAP_BW_TXN-1];
+ assign rxn_done_o = rxn_done_reg[CY_GAP_BW_TXN-1];
+ assign txn_gen    = (~txn_done_i && configs_completed);
+ assign rxn_gen    = txn_done_o;
+
+  // MEM Wr Generation
+  always @(posedge trans_m_axi_aclk) begin
+    if(!trans_m_axi_aresetn) begin
+      trans_m_axi_awvalid <= #TCQ 'h0;  
+      trans_m_axi_awaddr  <= #TCQ 'h0;
+      trans_m_axi_awlen   <= #TCQ 'h0; 
+      trans_m_axi_awsize  <= #TCQ 'h0;  
+      trans_m_axi_awburst <= #TCQ 'h0;   
+      trans_m_axi_awprot  <= #TCQ 'h0;  
+      trans_m_axi_awcache <= #TCQ 'h0;   
+      trans_m_axi_awlock  <= #TCQ 'h0;  
+      trans_m_axi_wvalid  <= #TCQ 'h0;  
+      trans_m_axi_wdata   <= #TCQ 'h0;  
+      trans_m_axi_wstrb   <= #TCQ 'h0; 
+      trans_m_axi_wlast   <= #TCQ 'h0;  
+      trans_m_axi_bready  <= #TCQ 'h0; 
+
+      trans_m_axi_arvalid <= #TCQ 'h0; 
+      trans_m_axi_araddr  <= #TCQ 'h0;
+      trans_m_axi_arlen   <= #TCQ 'h0; 
+      trans_m_axi_arsize  <= #TCQ 'h0;  
+      trans_m_axi_arburst <= #TCQ 'h0; 
+      trans_m_axi_arprot  <= #TCQ 'h0; 
+      trans_m_axi_arcache <= #TCQ 'h0;  
+      trans_m_axi_arlock  <= #TCQ 'h0; 
+      trans_m_axi_rready  <= #TCQ 'h0; 
+
+      pio_test_completed <= #TCQ 1'b0;
+      pio_test_failed    <= #TCQ 1'b0;
+      READ_DATA          <= #TCQ 'h0; 
+      WRITE_DATA         <= #TCQ 'h0;
+
+      txn_done_i        <= #TCQ 'h0;
+      rxn_done_i        <= #TCQ 'h0;
+      state             <= #TCQ MEM_TXN_GEN;
+    end else begin
+        case (state)
+        
+        MEM_TXN_GEN : begin  // Reset_State
+           if (txn_gen)
+           state             <= #TCQ MEM_MEW_WIT;
+           else if (rxn_gen)
+           state             <= #TCQ MEM_MER_WIT;
+           else
+           state             <= #TCQ MEM_TXN_GEN;
+
+           if (txn_gen) begin                          // MEM Wr TXN GENERATION
+           trans_m_axi_awvalid <= #TCQ 'h1;  
+           trans_m_axi_awaddr  <= #TCQ set_add[10]; 
+           trans_m_axi_awlen   <= #TCQ 'h0; 
+           trans_m_axi_awsize  <= #TCQ 'h2;  
+           trans_m_axi_awburst <= #TCQ 'h1;   
+           trans_m_axi_awprot  <= #TCQ 'h2;  
+           trans_m_axi_awcache <= #TCQ 'h3;   
+           trans_m_axi_awlock  <= #TCQ 'h0;  
+           trans_m_axi_wvalid  <= #TCQ 'h1;  
+           trans_m_axi_wdata   <= #TCQ set_data[spwd];  
+           trans_m_axi_wstrb   <= #TCQ 'hF; 
+           trans_m_axi_wlast   <= #TCQ 'h1;  
+           trans_m_axi_bready  <= #TCQ 'h1; 
+           
+           txn_done_i        <= #TCQ 'h0;
+
+           trans_m_axi_arvalid <= #TCQ 'h0; 
+           trans_m_axi_araddr  <= #TCQ 'h0;
+           trans_m_axi_arlen   <= #TCQ 'h0; 
+           trans_m_axi_arsize  <= #TCQ 'h0;  
+           trans_m_axi_arburst <= #TCQ 'h0; 
+           trans_m_axi_arprot  <= #TCQ 'h0; 
+           trans_m_axi_arcache <= #TCQ 'h0;  
+           trans_m_axi_arlock  <= #TCQ 'h0; 
+           trans_m_axi_rready  <= #TCQ 'h0; 
+           end else if (rxn_gen && trans_m_axi_arready) begin                 // MEM Rd TXN GENERATION
+           trans_m_axi_awvalid <= #TCQ 'h0;  
+           trans_m_axi_awaddr  <= #TCQ 'h0;
+           trans_m_axi_awlen   <= #TCQ 'h0; 
+           trans_m_axi_awsize  <= #TCQ 'h0;  
+           trans_m_axi_awburst <= #TCQ 'h0;   
+           trans_m_axi_awprot  <= #TCQ 'h0;  
+           trans_m_axi_awcache <= #TCQ 'h0;   
+           trans_m_axi_awlock  <= #TCQ 'h0;  
+           trans_m_axi_wvalid  <= #TCQ 'h0;  
+           trans_m_axi_wdata   <= #TCQ 'h0;  
+           trans_m_axi_wstrb   <= #TCQ 'h0; 
+           trans_m_axi_wlast   <= #TCQ 'h0;  
+           trans_m_axi_bready  <= #TCQ 'h0; 
+
+           rxn_done_i        <= #TCQ 'h0;
+
+           trans_m_axi_arvalid <= #TCQ 'h1; 
+           trans_m_axi_araddr  <= #TCQ set_add[8];
+           trans_m_axi_arlen   <= #TCQ 'h0; 
+           trans_m_axi_arsize  <= #TCQ 'h2;  
+           trans_m_axi_arburst <= #TCQ 'h1; 
+           trans_m_axi_arprot  <= #TCQ 'h2; 
+           trans_m_axi_arcache <= #TCQ 'h3;  
+           trans_m_axi_arlock  <= #TCQ 'h0; 
+           trans_m_axi_rready  <= #TCQ 'h1; 
+           end else begin
+           trans_m_axi_awvalid <= #TCQ 'h0;  
+           trans_m_axi_awaddr  <= #TCQ 'h0;
+           trans_m_axi_awlen   <= #TCQ 'h0; 
+           trans_m_axi_awsize  <= #TCQ 'h0;  
+           trans_m_axi_awburst <= #TCQ 'h0;   
+           trans_m_axi_awprot  <= #TCQ 'h0;  
+           trans_m_axi_awcache <= #TCQ 'h0;   
+           trans_m_axi_awlock  <= #TCQ 'h0;  
+           trans_m_axi_wvalid  <= #TCQ 'h0;  
+           trans_m_axi_wdata   <= #TCQ 'h0;  
+           trans_m_axi_wstrb   <= #TCQ 'h0; 
+           trans_m_axi_wlast   <= #TCQ 'h0;  
+           trans_m_axi_bready  <= #TCQ 'h0; 
+
+           trans_m_axi_arvalid <= #TCQ 'h0; 
+           trans_m_axi_araddr  <= #TCQ 'h0;
+           trans_m_axi_arlen   <= #TCQ 'h0; 
+           trans_m_axi_arsize  <= #TCQ 'h0;  
+           trans_m_axi_arburst <= #TCQ 'h0; 
+           trans_m_axi_arprot  <= #TCQ 'h0; 
+           trans_m_axi_arcache <= #TCQ 'h0;  
+           trans_m_axi_arlock  <= #TCQ 'h0; 
+           trans_m_axi_rready  <= #TCQ 'h0; 
+           end
+
+        end
+
+        MEM_MEW_WIT : begin  // MEM Wr TXN WAIT
+
+        if (trans_m_axi_awready) begin
+           trans_m_axi_awvalid <= #TCQ 'h0;
+           trans_m_axi_awaddr  <= #TCQ 'h0;
+           trans_m_axi_awlen   <= #TCQ 'h0; 
+           trans_m_axi_awsize  <= #TCQ 'h0;  
+           trans_m_axi_awburst <= #TCQ 'h0;   
+           trans_m_axi_awprot  <= #TCQ 'h0;  
+           trans_m_axi_awcache <= #TCQ 'h0;   
+           trans_m_axi_awlock  <= #TCQ 'h0;  
+        end
+
+        if (trans_m_axi_wready) begin
+           trans_m_axi_wvalid  <= #TCQ 'h0;  
+           trans_m_axi_wdata   <= #TCQ 'h0;  
+           trans_m_axi_wstrb   <= #TCQ 'h0; 
+           trans_m_axi_wlast   <= #TCQ 'h0;  
+           WRITE_DATA          <= #TCQ trans_m_axi_wdata[31:0];
+        end
+
+        if (trans_m_axi_bvalid) begin
+           trans_m_axi_bready  <= #TCQ 'h0; 
+           txn_done_i          <= #TCQ 'h1;
+           state               <= #TCQ MEM_TXN_GEN;
+        end
+
+        end
+
+        MEM_MER_WIT : begin  // MEM Rd TXN WAIT
+
+        if (trans_m_axi_arready) begin
+           trans_m_axi_arvalid <= #TCQ 'h0; 
+           trans_m_axi_araddr  <= #TCQ 'h0;
+           trans_m_axi_arlen   <= #TCQ 'h0; 
+           trans_m_axi_arsize  <= #TCQ 'h0;  
+           trans_m_axi_arburst <= #TCQ 'h0; 
+           trans_m_axi_arprot  <= #TCQ 'h0; 
+           trans_m_axi_arcache <= #TCQ 'h0;  
+           trans_m_axi_arlock  <= #TCQ 'h0; 
+        end
+
+        if (trans_m_axi_rvalid) begin
+           trans_m_axi_rready  <= #TCQ 'h0; 
+           rxn_done_i          <= #TCQ 'h1;
+           //READ_DATA           <= #TCQ trans_m_axi_rdata[95:64];
+           READ_DATA           <= #TCQ trans_m_axi_rdata[(<=: print $pcie_axi_if_wdt_int :>-1)-32:(<=: print $pcie_axi_if_wdt_int :>-1)-63];
+           state               <= #TCQ MEM_TXN_IDL;
+        end
+
+        end
+
+        MEM_TXN_IDL : begin  // MEM Wr and Rd are completed and IDLE
+        
+        if (READ_DATA == WRITE_DATA) begin
+           pio_test_completed <= #TCQ 1'b1;
+           pio_test_failed    <= #TCQ 1'b0;
+        end else begin
+           pio_test_completed <= #TCQ 1'b0;
+           pio_test_failed    <= #TCQ 1'b1;
+        end
+
+           //pio_test_failed    <= #TCQ configs_completed ? ((READ_DATA == WRITE_DATA) ? 1'b1 : 1'b0) : 1'b0;
+
+           state              <= #TCQ MEM_TXN_IDL;
+
+        end
+        endcase
+
+    end
+  end
+
+endmodule

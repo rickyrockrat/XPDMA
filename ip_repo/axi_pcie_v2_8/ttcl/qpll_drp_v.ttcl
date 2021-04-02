@@ -1,0 +1,8 @@
+<#: ttcl/GetValueSimParam.ttcl :>
+<: if {$gen_ies_gt_wrappers} ttcl_return :>
+<: if {$pcie_ext_gt_common_string == "TRUE"} ttcl_return :>
+<: setFileName "axi_pcie_v2_8_0_pcie_7x_v2_0_2_qpll_drp" :>
+<: setFileExtension ".v" :>
+<: setOutputDirectory  "axi_pcie_v2_8/hdl/src/verilog" :>
+<#: ttcl/header.ttcl :>
+<#: ttcl/qpll_drp_vlog.ttcl :>

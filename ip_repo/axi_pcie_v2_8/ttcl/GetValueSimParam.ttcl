@@ -1,0 +1,422 @@
+<: ;#---------------------------------- :>
+<: ;# Get variables from GUI selection  :>
+<: ;#---------------------------------- :>
+<: set prj_fam                   [getProjectFamily] :>
+<: set prj_dev                   [getProjectDevice] :>
+<: set prj_pkg                   [getProjectPackage] :>
+<: set prj_spd_grd               [getProjectSpeedGrade] :>
+<: set ComponentName             [getComponentNameString] :>
+<: set ComponentName_string      [getStringValue "ComponentName"] :>
+<: set include_rc                [getIntValue "C_INCLUDE_RC"] :>
+<: set pci_exp_ref_freq_int      [getIntValue "C_REF_CLK_FREQ"] :>
+<: set pci_exp_ref_freq_string   [getStringValue "C_REF_CLK_FREQ"] :>
+<: set max_lnk_spd_int           [getIntValue "C_MAX_LINK_SPEED"] :>
+<: set max_lnk_wdt_int           [getIntValue "C_NO_OF_LANES"] :>
+<: set pcie_axi_if_wdt_int       [getIntValue "C_S_AXI_DATA_WIDTH"] :>
+<: set max_lnk_wdt_string        [getStringValue "C_NO_OF_LANES"] :>
+<: set max_lnk_spd_string        [getStringValue "C_MAX_LINK_SPEED"] :>
+<: set ep                        [expr {(!$include_rc)?true:false}]  :>
+<: set c_pcie_blk_locn_int       [getIntValue "C_PCIE_BLK_LOCN"] :>
+<: set c_xlnx_ref_board_string   [getStringValue "C_XLNX_REF_BOARD"] :>
+<: set gt_use_mode               [getStringValue "C_PCIE_USE_MODE"]:>
+<: set pcie_ext_clk_string       [getStringValue "pcie_ext_clk"] :>
+<: set pcie_ext_gt_common_string [getStringValue "pcie_ext_gt_common"] :>
+<: set ext_ch_gt_drp_string      [getStringValue "ext_ch_gt_drp"] :>
+<: set transceiver_ctrl_status_ports_string [getStringValue "transceiver_ctrl_status_ports"] :>
+<: set ext_pipe_interface_string [getStringValue "ext_pipe_interface"] :>
+<: set shared_logic_in_core_string [getStringValue "shared_logic_in_core"] :>
+<: set axi_aclk_loopback_string [getStringValue "AXI_ACLK_LOOPBACK"] :>
+<: set dev_id_string             [getStringValue "C_DEVICE_ID"] :>
+<: regsub {0x} $dev_id_string {16'h} dev_id_hex :>
+<: set ven_id_string             [getStringValue "C_VENDOR_ID"] :>
+<: set rev_id_string             [getStringValue "C_REV_ID"] :>
+<: set cmps_string               "3'h1" :>
+<: set class_code_string         [getStringValue "C_CLASS_CODE"] :>
+<: set gen_ies_gt_wrappers [expr {(false)?true:false}]  :>
+<: set is_verilog                [expr {([isVerilogOutputRequired])?true:false}]  :>
+<: set is_vhdl                   [expr {([isVHDLOutputRequired])?true:false}]  :>
+<: ;#---------------------------------- :>
+<: ;# Set up the design path variables  :>
+<: ;#---------------------------------- :>
+<: if {$is_verilog} { :>
+<: set ip_path "inst" :>
+<: } else { :>
+<: set ip_path "U0" :>
+<: } :>
+<: set design_path "comp_axi_enhanced_pcie/comp_enhanced_core_top_wrap/axi_pcie_enhanced_core_top_i/pcie_7x_v2_0_2_inst" :>
+<: set pcie_path "pcie_top_with_gt_top.pcie_top_i/pcie_7x_i" :>
+<: set bram_path "pcie_top_with_gt_top.pcie_top_i/pcie_7x_i/pcie_bram_top" :>
+<: set ramb_path_xdc "use_tdp.ramb36/genblk*.bram36_tdp_bl.bram36_tdp_bl" :>
+<: set gt_path "" :>
+<: if {[string equal -nocase $gt_use_mode "1.0"] || [string equal -nocase $gt_use_mode "1.1"] } {  :>
+<:    if {[starts_with $prj_fam "artix7"] || [starts_with $prj_fam "qartix7"] || [starts_with $prj_fam "aartix7"] || ([starts_with $prj_fam "zynq"] && [starts_with $prj_dev "xc7z015"])} {  :>
+<:       set gt_path "pcie_top_with_gt_top.gt_ges.gt_top_i"  :>
+<:       set gen_ies_gt_wrappers [expr {(false)?true:false}]  :>
+<:    } else {  :>
+<:       set gt_path "pcie_top_with_gt_top.gt_ies.gt_top_i"  :>
+<:       set gen_ies_gt_wrappers  [expr {(true)?true:false}] :>
+<:    } :>
+<: } else {  :>
+<: set gt_path "pcie_top_with_gt_top.gt_ges.gt_top_i"  :>
+<: }  :>
+<: ;#----------------------------------- :>
+<: ;# Set up link width/speed variables  :>
+<: ;#----------------------------------- :>
+<: set x1g1 [expr {(false)?true:false}]  :>
+<: set x1g2 [expr {(false)?true:false}]  :>
+<: set x2g1 [expr {(false)?true:false}]  :>
+<: set x2g2 [expr {(false)?true:false}]  :>
+<: set x4g1 [expr {(false)?true:false}]  :>
+<: set x4g2 [expr {(false)?true:false}]  :>
+<: set x8g1 [expr {(false)?true:false}]  :>
+<: set x8g2 [expr {(false)?true:false}]  :>
+<: if {$max_lnk_wdt_int == 8} {  :>
+<: if {$max_lnk_spd_int == 1} {  :>
+<: set x8g2 [expr {(true)?true:false}]  :>
+<: } else { :>
+<: set x8g1 [expr {(true)?true:false}]  :>
+<: } :>
+<: } :>
+<: if {$max_lnk_wdt_int == 4} {  :>
+<: if {$max_lnk_spd_int == 1} {  :>
+<: set x4g2 [expr {(true)?true:false}]  :>
+<: } else { :>
+<: set x4g1 [expr {(true)?true:false}]  :>
+<: } :>
+<: } :>
+<: if {$max_lnk_wdt_int == 2} {  :>
+<: if {$max_lnk_spd_int == 1} {  :>
+<: set x2g2 [expr {(true)?true:false}]  :>
+<: } else { :>
+<: set x2g1 [expr {(true)?true:false}]  :>
+<: } :>
+<: } :>
+<: if {$max_lnk_wdt_int == 1} {  :>
+<: if {$max_lnk_spd_int == 1} {  :>
+<: set x1g2 [expr {(true)?true:false}]  :>
+<: } else { :>
+<: set x1g1 [expr {(true)?true:false}]  :>
+<: } :>
+<: } :>
+<: set xlnx_ref_board_ucf [expr {(false)?true:false}]  :>
+<: set xlnx_ref_board_kc705_reva [expr {(false)?true:false}]  :>
+<: set xlnx_ref_board_kc705_revb [expr {(false)?true:false}]  :>
+<: set xlnx_ref_board_kc705_revc [expr {(false)?true:false}]  :>
+<: set xlnx_ref_board_vc707 [expr {(false)?true:false}]  :>
+<: set xlnx_ref_board_ac701 [expr {(false)?true:false}]  :>
+<: set xlnx_ref_board_zc706 [expr {(false)?true:false}]  :>
+<: set xlnx_ref_board_lcd_display [expr {(false)?true:false}]  :>
+<: if {([string equal -nocase $c_xlnx_ref_board_string "KC705_REVA"] || [string equal -nocase $c_xlnx_ref_board_string "KC705_REVB"] || [string equal -nocase $c_xlnx_ref_board_string "KC705_REVC"]) && [starts_with $ComponentName "enable_lcd"] } {  :>
+<: set xlnx_ref_board_lcd_display [expr {(true)?true:false}]  :>
+<: } elseif  {([string equal -nocase $c_xlnx_ref_board_string "VC707"]) && [starts_with $ComponentName "enable_lcd"] }  { :>
+<: set xlnx_ref_board_lcd_display [expr {(true)?true:false}]  :>
+<: } else { :>
+<: set xlnx_ref_board_lcd_display [expr {(false)?true:false}]  :>
+<: } :>
+<: if {[string equal -nocase $c_xlnx_ref_board_string "KC705_REVA"] || [string equal -nocase $c_xlnx_ref_board_string "KC705_REVB"] || [string equal -nocase $c_xlnx_ref_board_string "KC705_REVC"] || [string equal -nocase $c_xlnx_ref_board_string "VC707"] || [string equal -nocase $c_xlnx_ref_board_string "AC701"]} {  :>
+<: set xlnx_ref_board_ucf [expr {(true)?true:false}]  :>
+<: if {[string equal -nocase $c_xlnx_ref_board_string "KC705_REVA"]} {  :>
+<: set xlnx_ref_board_kc705_reva [expr {(true)?true:false}]  :>
+<: } :>
+<: if {[string equal -nocase $c_xlnx_ref_board_string "KC705_REVB"]} {  :>
+<: set xlnx_ref_board_kc705_revb [expr {(true)?true:false}]  :>
+<: } :>
+<: if {[string equal -nocase $c_xlnx_ref_board_string "KC705_REVC"]} {  :>
+<: set xlnx_ref_board_kc705_revc [expr {(true)?true:false}]  :>
+<: } :>
+<: } :>
+<: if {[string equal -nocase $c_xlnx_ref_board_string "VC707"]} {  :>
+<: set xlnx_ref_board_vc707 [expr {(true)?true:false}]  :>
+<: } :>
+<: if {[string equal -nocase $c_xlnx_ref_board_string "AC701"]} {  :>
+<: set xlnx_ref_board_ac701 [expr {(true)?true:false}]  :>
+<: } :>
+<: if {[string equal -nocase $c_xlnx_ref_board_string "ZC706"]} {  :>
+<: set xlnx_ref_board_zc706 [expr {(true)?true:false}]  :>
+<: } :>
+<: ;#--------------------------:>
+<: ;#  Set up UCF Generation   :>
+<: ;#--------------------------:>
+<: ;# blk_locn | PCIe Location :>
+<: ;#    0     |     X0Y0      :>
+<: ;#    1     |     X0Y1      :>
+<: ;#    2     |     X0Y2      :>
+<: ;#    3     |     X1Y0      :>
+<: ;#    4     |     X1Y1      :>
+<: ;#--------------------------:>
+<: set gen_x0y0_ucf [expr {(false)?true:false}]  :>
+<: set gen_x0y1_ucf [expr {(false)?true:false}]  :>
+<: set gen_x0y2_ucf [expr {(false)?true:false}]  :>
+<: set gen_x1y0_ucf [expr {(false)?true:false}]  :>
+<: set gen_x1y1_ucf [expr {(false)?true:false}]  :>
+<: set design_name "xilinx_axi_pcie_7x_ep" :>
+<: set lnk_spd "" :>
+<: set ucf_name "axi_pcie" :>
+<: set xdc_name "xilinx_axi_pcie" :>
+<: set pcie_blk "X0Y0" :>
+<: send_dbg_msg 1 "PCIE BLK LOCN=$c_pcie_blk_locn_int" :>
+<: ;#------------------------------------------------------ :>
+<: ;# Set the Lane 0 XY Coordinates.                        :>
+<: ;# Default to Invalid Coord to ensure no false positives :>
+<: ;# Copied directory from PCIe GEN2 Streaming GVSP.ttcl   :>
+<: ;#------------------------------------------------------ :>
+<: set x0y0_ln0 99   :>
+<: set x0y1_ln0 99   :>
+<: set x0y2_ln0 99   :>
+<: set x1y0_ln0 99   :>
+<: set x1y1_ln0 99   :>
+<: set x0y3_xucf 999 :>
+<: set x0y3_yucf 999 :>
+<: set x0y2_xucf 999 :>
+<: set x0y2_yucf 999 :>
+<: set x0y1_xucf 999 :>
+<: set x0y1_yucf 999 :>
+<: set x0y0_xucf 999 :>
+<: set x0y0_yucf 999 :>
+<: set x1y0_xucf 999 :>
+<: set x1y0_yucf 999 :>
+<: set x1y1_xucf 999 :>
+<: set x1y1_yucf 999 :>
+<: ;#Set BRAM and GT LOC's for Artix-7 Devices :>
+<: if {[starts_with $prj_fam "artix7"] || [starts_with $prj_fam "qartix7"] || [starts_with $prj_fam "aartix7"]} {  :>
+<: if {[starts_with $prj_dev "xc7a35t"] || [starts_with $prj_dev "xc7a50t"] || [starts_with $prj_dev "xa7a35t"] || [starts_with $prj_dev "xa7a50t"] || [starts_with $prj_dev "xq7a50t"] || [starts_with $prj_dev "xc7a15t"] || [starts_with $prj_dev "xa7a15t"]} {  :>
+<: if {[starts_with $prj_pkg "cpg236"]} { :>
+<: set x0y0_ln0 1 :>
+<: } else { :>
+<: set x0y0_ln0 3 :>
+<: } :>
+<: } else { :>
+<: set x0y0_ln0 7 :>
+<: } :>
+<: if {[starts_with $prj_dev "xc7a100t"] || [starts_with $prj_dev "xq7a100t"] || [starts_with $prj_dev "xa7a100t"] || [starts_with $prj_dev "xc7a75t"] || [starts_with $prj_dev "xa7a75t"]} {  :>
+<: set x0y0_xucf 1 :>
+<: set x0y0_yucf 31 :>
+<: } elseif {[starts_with $prj_dev "xc7a35t"] || [starts_with $prj_dev "xc7a50t"] || [starts_with $prj_dev "xa7a35t"] || [starts_with $prj_dev "xa7a50t"] || [starts_with $prj_dev "xq7a50t"] || [starts_with $prj_dev "xc7a15t"] || [starts_with $prj_dev "xa7a15t"]} {  :>
+<: set x0y0_xucf 0 :>
+<: set x0y0_yucf 20 :>
+<: } elseif  {[starts_with $prj_dev "xc7a200t"] || [starts_with $prj_dev "xq7a200t"]}  { :>
+<: set x0y0_xucf 1 :>
+<: set x0y0_yucf 41 :>
+<: } else { :>
+<: set x0y0_xucf 999 :>
+<: set x0y0_yucf 999 :>
+<: } :>
+<: } :>
+<: ;#Set BRAM and GT LOC's for Kintex7 Devices :>
+<: if {[starts_with $prj_dev "xc7k70t"] || [starts_with $prj_dev "xc7k70tl"] } {  :>
+<: if {([starts_with $prj_pkg "fbg484"]) || ([starts_with $prj_pkg "sbg324"])} {  :>
+<: set x0y0_ln0 3 :>
+<: } else { :>
+<: set x0y0_ln0 7 :>
+<: } :>
+<: set x0y0_xucf 1 :>
+<: set x0y0_yucf 20 :>
+<: } :>
+<: if {[starts_with $prj_dev "xc7k160t"] || [starts_with $prj_dev "xc7k160tl"]} {  :>
+<: if {([starts_with $prj_pkg "fbg484"]) || ([starts_with $prj_pkg "sbg324"])} {  :>
+<: set x0y0_ln0 3 :>
+<: } else { :>
+<: set x0y0_ln0 7 :>
+<: } :>
+<: set x0y0_xucf 4 :>
+<: set x0y0_yucf 30 :>
+<: } :>
+<: if {[starts_with $prj_dev "xc7k325t"] || [starts_with $prj_dev "xc7k325tl"] || [starts_with $prj_dev "xq7k325t"] || [starts_with $prj_dev "xq7k325tl"] } {  :>
+<: set x0y0_ln0 7 :>
+<: set x0y0_xucf 4 :>
+<: set x0y0_yucf 30 :>
+<: } :>
+<: if {[starts_with $prj_dev "xc7k355t"] || [starts_with $prj_dev "xc7k355tl"]} {  :>
+<: set x0y0_ln0 15 :>
+<: set x0y0_xucf 10 :>
+<: set x0y0_yucf 30 :>
+<: } :>
+<: if {[starts_with $prj_dev "xc7k410t"] || [starts_with $prj_dev "xc7k410tl"] || [starts_with $prj_dev "xq7k410t"] || [starts_with $prj_dev "xq7k410t"]} {  :>
+<: set x0y0_ln0 7 :>
+<: set x0y0_xucf 9 :>
+<: set x0y0_yucf 30 :>
+<: } :>
+<: if {[starts_with $prj_dev "xc7k420t"] || [starts_with $prj_dev "xc7k420tl"]} {  :>
+<: set x0y0_ln0 19 :>
+<: set x0y0_xucf 10 :>
+<: set x0y0_yucf 40 :>
+<: } :>
+<: if {[starts_with $prj_dev "xc7k480t"] || [starts_with $prj_dev "xc7k480tl"]} {  :>
+<: set x0y0_ln0 19 :>
+<: set x0y0_xucf 10 :>
+<: set x0y0_yucf 40 :>
+<: } :>
+<: ;#Set BRAM and GT LOC's for Virtex7 Devices :>
+<: if {[starts_with $prj_dev "xc7vx485t"] || [starts_with $prj_dev "xq7vx485t"] } {  :>
+<: if {[starts_with $prj_pkg "ffg1158"] || [starts_with $prj_pkg "ffg1927"]} { :>
+<: set x0y0_ln0 11 :>
+<: set x0y1_ln0 23 :>
+<: } :>
+<: set x1y0_ln0 11 :>
+<: set x1y1_ln0 23 :>
+<: set x1y1_xucf 13 :>
+<: set x1y1_yucf 50 :>
+<: set x1y0_xucf 13 :>
+<: set x1y0_yucf 20 :>
+<: set x0y1_xucf 1 :>
+<: set x0y1_yucf 50 :>
+<: set x0y0_xucf 1 :>
+<: set x0y0_yucf 20 :>
+<: } :>
+<: if {[starts_with $prj_dev "xc7vx550t"]} {  :>
+<: set x0y0_ln0 15 :>
+<: set x0y1_ln0 27 :>
+<: set x0y1_xucf 7 :>
+<: set x0y1_yucf 40 :>
+<: set x0y0_xucf 7 :>
+<: set x0y0_yucf 10 :>
+<: } :>
+<: if {[starts_with $prj_dev "xc7v585t"] || [starts_with $prj_dev "xq7v585t"] } {  :>
+<: set x0y0_ln0 7 :>
+<: set x0y1_ln0 19 :>
+<: set x0y2_ln0 31 :>
+<: set x0y2_xucf 7 :>
+<: set x0y2_yucf 70 :>
+<: set x0y1_xucf 7 :>
+<: set x0y1_yucf 40 :>
+<: set x0y0_xucf 7 :>
+<: set x0y0_yucf 10 :>
+<: } :>
+<: if {[starts_with $prj_dev "xc7v1500t"]} {  :>
+<: set x0y0_ln0 7 :>
+<: set x0y1_ln0 19 :>
+<: set x0y2_ln0 31 :>
+<: set x0y2_xucf 9 :>
+<: set x0y2_yucf 70 :>
+<: set x0y1_xucf 9 :>
+<: set x0y1_yucf 40 :>
+<: set x0y0_xucf 9 :>
+<: set x0y0_yucf 10 :>
+<: } :>
+<: if {[starts_with $prj_dev "xc7v2000t"]} {  :>
+<: if {[starts_with $prj_pkg "flg1925"]} { :>
+<: set x0y0_ln0 11 :>
+<: } :>
+<: set x0y1_ln0 19 :>
+<: set x0y1_xucf 9 :>
+<: set x0y1_yucf 40 :>
+<: set x0y0_xucf 9 :>
+<: set x0y0_yucf 10 :>
+<: if {[starts_with $prj_pkg "fhg1761"]} {  :>
+<: set x0y0_ln0 7 :>
+<: set x0y2_ln0 31 :>
+<: set x0y2_xucf 9 :>
+<: set x0y2_yucf 70 :>
+<: } :>
+<: } :>
+<: if {[starts_with $prj_dev "xc7z030"] || [starts_with $prj_dev "xq7z030"] || [starts_with $prj_dev "xa7z030"] || [starts_with $prj_dev "xc7z015"]} {  :>
+<: set x0y0_ln0 3 :>
+<: if {[starts_with $prj_dev "xc7z015"]} { :>
+<: set x0y0_xucf 2 :>
+<: } else { :>
+<: set x0y0_xucf 5 :>
+<: } :>
+<: set x0y0_yucf 1 :>
+<: } :>
+<: if {[starts_with $prj_dev "xc7z045"] || [starts_with $prj_dev "xq7z045"] || [starts_with $prj_dev "xc7z035"] } {  :>
+<: set x0y0_ln0 15 :>
+<: set x0y0_xucf 6 :>
+<: set x0y0_yucf 30 :>
+<: } :>
+<: if {[starts_with $prj_dev "xc7z100"] || [starts_with $prj_dev "xq7z100"] } {  :>
+<: set x0y0_ln0 15 :>
+<: set x0y0_xucf 9 :>
+<: set x0y0_yucf 30 :>
+<: } :>
+<: ;#NOTE - in the following string comparisons, the leading (?i) indicates ignore-case :>
+<: set part_is_xc7k325t [expr {([regexp {(?i)xc7k325t} $prj_dev])?true:false}]  :>
+<: set part_is_xc7k325tl [expr {([regexp {(?i)xc7k325tl} $prj_dev])?true:false}]  :>
+<: set part_is_xq7k325t [expr {([regexp {(?i)xq7k325t} $prj_dev])?true:false}]  :>
+<: set part_is_xq7k325tl [expr {([regexp {(?i)xq7k325tl} $prj_dev])?true:false}]  :>
+<: set part_is_xc7vx485t [expr {([regexp {(?i)xc7vx485t} $prj_dev])?true:false}]  :>
+<: set part_is_xc7a100t [expr {([regexp {(?i)xc7a100t} $prj_dev])?true:false}]  :>
+<: set part_is_xc7a100tl [expr {([regexp {(?i)xc7a100tl} $prj_dev])?true:false}]  :>
+<: set part_is_xc7a200t [expr {([regexp {(?i)xc7a200t} $prj_dev])?true:false}]  :>
+<: set part_is_xc7a200tl [expr {([regexp {(?i)xc7a200tl} $prj_dev])?true:false}]  :>
+<: set part_is_xc7a35t [expr {([regexp {(?i)xc7a35t} $prj_dev])?true:false}]  :>
+<: set part_is_xa7a35t [expr {([regexp {(?i)xa7a35t} $prj_dev])?true:false}]  :>
+<: set part_is_xc7a35tl [expr {([regexp {(?i)xc7a35tl} $prj_dev])?true:false}]  :>
+<: set part_is_xc7a50t [expr {([regexp {(?i)xc7a50t} $prj_dev])?true:false}]  :>
+<: set part_is_xa7a50t [expr {([regexp {(?i)xa7a50t} $prj_dev])?true:false}]  :>
+<: set part_is_xc7a50tl [expr {([regexp {(?i)xc7a50tl} $prj_dev])?true:false}]  :>
+<: set part_is_xq7a50t [expr {([regexp {(?i)xq7a50t} $prj_dev])?true:false}]  :>
+<: set part_is_xc7z045 [expr {([regexp {(?i)xc7z045} $prj_dev])?true:false}]  :>
+<: set part_is_xc7a15t [expr {([regexp {(?i)xc7a15t} $prj_dev])?true:false}]  :>
+<: set part_is_xa7a15t [expr {([regexp {(?i)xa7a15t} $prj_dev])?true:false}]  :>
+<: set part_is_xc7a15ti [expr {([regexp {(?i)xc7a15ti} $prj_dev])?true:false}]  :>
+<: set pkg_is_ffg900 [expr {([regexp {(?i)ffg900} $prj_pkg])?true:false}]  :>
+<: set pkg_is_rf900 [expr {([regexp {(?i)rf900} $prj_pkg])?true:false}]  :>
+<: set pkg_is_ffg1761 [expr {([regexp {(?i)ffg1761} $prj_pkg])?true:false}]  :>
+<: set pkg_is_ffg1157 [expr {([regexp {(?i)ffg1157} $prj_pkg])?true:false}]  :>
+<: set pkg_is_fgg676 [expr {([regexp {(?i)fgg676} $prj_pkg])?true:false}]  :>
+<: set pkg_is_fbg676 [expr {([regexp {(?i)fbg676} $prj_pkg])?true:false}]  :>
+<: set pkg_is_cpg236 [expr {([regexp {(?i)cpg236} $prj_pkg])?true:false}]  :>
+<: set pkg_is_csg325 [expr {([regexp {(?i)csg325} $prj_pkg])?true:false}]  :>
+<: ;#------------------------------------------------------ :>
+<: ;# Set the path to the GT Channel                        :>
+<: ;#------------------------------------------------------ :>
+<: set gt_channel_path "" :>
+<: set gt_channel_type "" :>
+<: set gt_device "" :>
+<: if {[starts_with $prj_fam "artix7"] || [starts_with $prj_fam "qartix7"] || [starts_with $prj_fam "aartix7"] || ([starts_with $prj_fam "zynq"] && [starts_with $prj_dev "xc7z015"])} {  :>
+<: set gt_channel_path "gtp_channel.gtpe2_channel_i" :>
+<: set gt_channel_type "GTPE2" :>
+<: set gt_device "GTP" :>
+<: } else { :>
+<: set gt_channel_path "gtx_channel.gtxe2_channel_i" :>
+<: set gt_channel_type "GTXE2" :>
+<: set gt_device "GTX" :>
+<: } :>
+<: if {$pcie_ext_clk_string == "FALSE"}  { :>
+<: set pipe_clk_path [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat "" $design_path] "/"] $gt_path] "/pipe_wrapper_i/pipe_clock_int."] :>
+<: } else { :>
+<: set pipe_clk_path [ttcl_string_concat $ComponentName_string "_support_i/"] :>
+<: } :>
+<: set ref_clk_freq 100 :>
+<: set ref_clk_prd 10 :>
+<: if {$pci_exp_ref_freq_int == 0} {  :>
+<: set ref_clk_freq 100 :>
+<: set ref_clk_prd 10 :>
+<: } elseif  {($pci_exp_ref_freq_int == 1)} {  :>
+<: set ref_clk_freq 125 :>
+<: set ref_clk_prd 8 :>
+<: } else { :>
+<: set ref_clk_freq 250 :>
+<: set ref_clk_prd 4 :>
+<: } :>
+<: if {$max_lnk_spd_int == 1} {  :>
+<: set lnk_spd "g2" :>
+<: } else { :>
+<: set lnk_spd "g1" :>
+<: } :>
+<: if {($c_pcie_blk_locn_int == 0)} {  :>
+<: set xdc_name [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat "" $design_name] "_x"] $max_lnk_wdt_string] $lnk_spd]] "_X0Y0"]  :>
+<: set gen_x0y0_ucf [expr {(true)?true:false}]  :>
+<: set ucf_name "axi_pcie_X0Y0" :>
+<: set pcie_blk "X0Y0"  :>
+<: } elseif  {($c_pcie_blk_locn_int == 1)} {  :>
+<: set xdc_name [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat "" $design_name] "_x"] $max_lnk_wdt_string] $lnk_spd]] "_X0Y1"]  :>
+<: set gen_x0y1_ucf [expr {(true)?true:false}]  :>
+<: set ucf_name "axi_pcie_X0Y1"  :>
+<: set pcie_blk "X0Y1"  :>
+<: } elseif  {($c_pcie_blk_locn_int == 2)} {  :>
+<: set xdc_name [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat "" $design_name] "_x"] $max_lnk_wdt_string] $lnk_spd]] "_X0Y2"]  :>
+<: set gen_x0y2_ucf [expr {(true)?true:false}]  :>
+<: set ucf_name "axi_pcie_X0Y2"  :>
+<: set pcie_blk "X0Y2"  :>
+<: } elseif  {($c_pcie_blk_locn_int == 3)} {  :>
+<: set xdc_name [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat "" $design_name] "_x"] $max_lnk_wdt_string] $lnk_spd]] "_X1Y0"]  :>
+<: set gen_x1y0_ucf [expr {(true)?true:false}]  :>
+<: set ucf_name "axi_pcie_X1Y0"  :>
+<: set pcie_blk "X1Y0"  :>
+<: } else { :>
+<: set xdc_name [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat [ttcl_string_concat "" $design_name] "_x"] $max_lnk_wdt_string] $lnk_spd] ] "_X1Y1"]  :>
+<: set gen_x1y1_ucf [expr {(true)?true:false}]  :>
+<: set ucf_name "axi_pcie_X1Y1"  :>
+<: set pcie_blk "X1Y1"  :>
+<: } :>

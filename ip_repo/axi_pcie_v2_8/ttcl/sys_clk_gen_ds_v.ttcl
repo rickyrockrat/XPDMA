@@ -1,0 +1,40 @@
+<#: ttcl/GetValueSimParam.ttcl :>
+<: if {$include_rc} ttcl_return :>
+<: setFileName  "sys_clk_gen_ds" :>
+<: setFileExtension ".v" :>
+<: setOutputDirectory [ttcl_string_concat $ComponentName "/simulation/functional"] :>
+<#: ttcl/header.ttcl :>
+//-----------------------------------------------------------------------------
+// Project    : AXI PCIe example design
+// Project    : Series-7 Integrated Block for PCI Express
+// File       : sys_clk_gen_ds.v
+// Version    : 3.1
+//--
+//--------------------------------------------------------------------------------
+
+`timescale 1ps/1ps
+
+module sys_clk_gen_ds (sys_clk_p, sys_clk_n);
+
+output	         sys_clk_p;
+output	         sys_clk_n;
+
+parameter        offset = 0;
+parameter        halfcycle = 500;
+
+
+sys_clk_gen 	#(
+
+                 .offset( offset ),
+                 .halfcycle( halfcycle )
+
+)
+clk_gen (
+
+                 .sys_clk(sys_clk_p)
+
+);
+
+assign sys_clk_n = !sys_clk_p;
+
+endmodule // sys_clk_gen_ds

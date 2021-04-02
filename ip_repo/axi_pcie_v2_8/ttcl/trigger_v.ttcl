@@ -1,0 +1,4 @@
+<: if { [get_project_property PREFHDL] ne "VERILOG"  } { ttcl_return } :>
+<: setFileName "trigger" :>
+<: setFileExtension ".v" :>
+<#: ttcl/header.ttcl :>

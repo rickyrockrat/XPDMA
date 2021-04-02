@@ -1,0 +1,21 @@
+<#: ttcl/GetValueSimParam.ttcl :>
+<: set ComponentName [getComponentNameString] :>
+<: setOutputDirectory "./" :>
+<: setFileName "gen_ex_cores" :>
+<: setFileExtension ".tcl" :>
+<: set wd [ file dirname [ get_property xml_file_name [ current_ipbom ] ] ] :>
+ 
+<: if {$pcie_axi_if_wdt_int == 128} { :>
+create_ip -name axi_bram_ctrl -version 4.0 -vendor xilinx.com -library ip -module_name axi_bram_ctrl_0
+set_property -dict [list CONFIG.DATA_WIDTH {128} CONFIG.ID_WIDTH {4} CONFIG.PROTOCOL {AXI4} CONFIG.SUPPORTS_NARROW_BURST {0} CONFIG.SINGLE_PORT_BRAM {1} CONFIG.USE_ECC {0} CONFIG.FAULT_INJECT {0} CONFIG.ECC_ONOFF_RESET_VALUE {0} CONFIG.BMG_INSTANCE {INTERNAL} CONFIG.MEM_DEPTH {2048}] [get_ips axi_bram_ctrl_0]
+<: } else { :>
+create_ip -name axi_bram_ctrl -version 4.0 -vendor xilinx.com -library ip -module_name axi_bram_ctrl_0
+set_property -dict [list CONFIG.DATA_WIDTH {64} CONFIG.ID_WIDTH {4} CONFIG.PROTOCOL {AXI4} CONFIG.SUPPORTS_NARROW_BURST {0} CONFIG.SINGLE_PORT_BRAM {1} CONFIG.USE_ECC {0} CONFIG.FAULT_INJECT {0} CONFIG.ECC_ONOFF_RESET_VALUE {0} CONFIG.BMG_INSTANCE {INTERNAL} CONFIG.MEM_DEPTH {2048}] [get_ips axi_bram_ctrl_0]
+<: } :>
+
+<: ;#Setting this parameter will make dcp false for all ips in the design :>
+<: ;#set_property generate_synth_checkpoint false [get_files *.xci] :>
+
+generate_target all [get_ips *]
+
+

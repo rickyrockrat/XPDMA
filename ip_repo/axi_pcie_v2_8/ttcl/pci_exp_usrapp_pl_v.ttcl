@@ -1,0 +1,100 @@
+<#: ttcl/GetValueSimParam.ttcl :>
+<: if {$include_rc} ttcl_return :>
+<: setFileName  "pci_exp_usrapp_pl" :>
+<: setFileExtension ".v" :>
+<: setOutputDirectory [ttcl_string_concat $ComponentName "/simulation/dsport"] :>
+<#: ttcl/header.ttcl :>
+//-----------------------------------------------------------------------------
+// Project    : AXI PCIe example design
+// Project    : Series-7 Integrated Block for PCI Express
+// File       : pci_exp_usrapp_pl.v
+// Version    : 3.1
+//--
+//--------------------------------------------------------------------------------
+`timescale 1ns/1ns
+module pci_exp_usrapp_pl (
+
+                          pl_initial_link_width,
+                          pl_lane_reversal_mode,
+                          pl_link_gen2_capable,
+                          pl_link_partner_gen2_supported,
+                          pl_link_upcfg_capable,
+                          pl_ltssm_state,
+                          pl_received_hot_rst,
+                          pl_sel_link_rate,
+                          pl_sel_link_width,
+                          pl_directed_link_auton,
+                          pl_directed_link_change,
+                          pl_directed_link_speed,
+                          pl_directed_link_width,
+                          pl_upstream_prefer_deemph,
+                          speed_change_done_n,
+
+                          trn_lnk_up_n,
+                          trn_clk,
+                          trn_reset_n
+                    
+                          );
+
+
+input [2:0]              pl_initial_link_width;
+input [1:0]              pl_lane_reversal_mode;
+input                    pl_link_gen2_capable;
+input                    pl_link_partner_gen2_supported;
+input                    pl_link_upcfg_capable;
+input [5:0]              pl_ltssm_state;
+input                    pl_received_hot_rst;
+input                    pl_sel_link_rate;
+input [1:0]              pl_sel_link_width;
+output                   pl_directed_link_auton;
+output [1:0]             pl_directed_link_change;
+output                   pl_directed_link_speed;
+output [1:0]             pl_directed_link_width;
+output                   pl_upstream_prefer_deemph;
+output                   speed_change_done_n;
+
+
+input                    trn_lnk_up_n;
+input                    trn_clk;
+input                    trn_reset_n;
+
+parameter                Tcq = 1;
+parameter                LINK_CAP_MAX_LINK_SPEED = 4'h1;
+
+reg                      pl_directed_link_auton;
+reg [1:0]                pl_directed_link_change;
+reg                      pl_directed_link_speed;
+reg [1:0]                pl_directed_link_width;
+reg                      pl_upstream_prefer_deemph;
+reg                      speed_change_done_n;
+
+initial begin
+
+   pl_directed_link_auton <= 1'b0;
+   pl_directed_link_change <= 2'b0;
+   pl_directed_link_speed <= 1'b0;
+   pl_directed_link_width <= 2'b0;
+   pl_upstream_prefer_deemph <= 1'b0;
+   speed_change_done_n <= 1'b1;
+
+   if (LINK_CAP_MAX_LINK_SPEED == 4'h2) begin
+
+     wait (trn_lnk_up_n == 1'b0);
+
+     if (pl_link_gen2_capable && pl_link_partner_gen2_supported) begin
+
+       wait (pl_sel_link_rate == 1'h1);
+       wait (pl_ltssm_state == 6'h16);
+
+       speed_change_done_n <= 1'b0; 
+
+     end
+     else begin
+       speed_change_done_n <= 1'b0; 
+     end
+   end
+
+end
+
+endmodule // pci_exp_usrapp_pl
+

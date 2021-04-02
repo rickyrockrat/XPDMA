@@ -1,0 +1,33 @@
+<#: ttcl/GetValueSimParam.ttcl :>
+<: setFileName "sys_clk_gen" :>
+<: setFileExtension ".v" :>
+<: setOutputDirectory [ttcl_string_concat $ComponentName "/simulation/functional"] :>
+<#: ttcl/header.ttcl :>
+
+//-----------------------------------------------------------------------------
+// Project    : Series-7 Integrated Block for PCI Express
+// File       : sys_clk_gen.v
+// Version    : 2.1
+//--
+//--------------------------------------------------------------------------------
+`timescale 1ps/1ps
+
+module sys_clk_gen (sys_clk);
+
+output	sys_clk;
+
+reg		sys_clk;
+
+parameter        offset = 0;
+parameter        halfcycle = 500;
+
+initial begin
+
+	sys_clk = 0;
+	#(offset);
+
+	forever #(halfcycle) sys_clk = ~sys_clk;
+
+end
+
+endmodule // sys_clk_gen

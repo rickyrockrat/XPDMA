@@ -1,0 +1,109 @@
+<#: ttcl/GetValueSimParam.ttcl :>
+<: if {!$gen_x0y2_ucf} ttcl_return :>
+<: setFileName $xdc_name :>
+<: setFileExtension ".xdc" :>
+<: setOutputDirectory [ttcl_add $ComponentName "/example_design"] :>
+<#: ttcl/header.ttcl :>
+#
+###############################################################################
+# User Configuration 
+# Link Width   - x<=: print $max_lnk_wdt_int :>
+# Link Speed   - gen<=: ttcl_add $max_lnk_spd_int 1 :>
+# Family       - <=: print $prj_fam :>
+# Part         - <=: print $prj_dev :>
+# Package      - <=: print $prj_pkg :>
+# Speed grade  - <=: print $prj_spd_grd :>
+# PCIe Block   - <=: print $pcie_blk :>
+###############################################################################
+# User Time Names / User Time Groups / Time Specs
+###############################################################################
+
+###############################################################################
+# User Physical Constraints
+###############################################################################
+
+
+###############################################################################
+# Pinout and Related I/O Constraints
+###############################################################################
+
+#
+# SYS reset (input) signal.  The sys_reset_n signal should be
+# obtained from the PCI Express interface if possible.  For
+# slot based form factors, a system reset signal is usually
+# present on the connector.  For cable based form factors, a
+# system reset signal may not be available.  In this case, the
+# system reset signal must be generated locally by some form of
+# supervisory circuit.  You may change the IOSTANDARD and LOC
+# to suit your requirements and VCCO voltage banking rules.
+# Some 7 series devices do not have 3.3 V I/Os available.
+# Therefore the appropriate level shift is required to operate
+# with these devices that contain only 1.8 V banks.
+#
+
+<: if {[string equal -nocase $prj_fam "zynq"] && $part_is_xc7z045 && $pkg_is_ffg900} { :>
+set_property IOSTANDARD LVCMOS15 [get_ports sys_rst_n]
+<: } elseif {[string equal -nocase $prj_fam "virtex7"] && $part_is_xc7vx485t && ($pkg_is_ffg1761 || $pkg_is_ffg1157)} { :>
+set_property IOSTANDARD LVCMOS18 [get_ports sys_rst_n]
+<: } elseif {[starts_with $prj_fam "kintex7"] && ($part_is_xc7k325t || $part_is_xc7k325tl) && $pkg_is_ffg900} { :>
+set_property IOSTANDARD LVCMOS25 [get_ports sys_rst_n]
+<: } elseif {[starts_with $prj_fam "artix7"] && ($part_is_xc7a200t || $part_is_xc7a200tl) && $pkg_is_fbg676} { :>
+set_property IOSTANDARD LVCMOS33 [get_ports sys_rst_n]
+<: } :>
+<: if {[string equal -nocase $prj_fam "zynq"] && $part_is_xc7z045 && $pkg_is_ffg900} { :>
+set_property LOC AK23 [get_ports sys_rst_n]
+<: } elseif {[string equal -nocase $prj_fam "virtex7"] && $part_is_xc7vx485t && $pkg_is_ffg1761} { :>
+set_property LOC AV35 [get_ports sys_rst_n]
+<: } elseif {[string equal -nocase $prj_fam "virtex7"] && $part_is_xc7vx485t && $pkg_is_ffg1157} { :>
+set_property LOC AF24 [get_ports sys_rst_n]
+<: } elseif {[starts_with $prj_fam "kintex7"] && ($part_is_xc7k325t || $part_is_xc7k325tl) && $pkg_is_ffg900} { :>
+set_property LOC G25 [get_ports sys_rst_n]
+<: } elseif {[starts_with $prj_fam "artix7"] && ($part_is_xc7a200t || $part_is_xc7a200tl) && $pkg_is_fbg676} { :>
+set_property LOC M20 [get_ports sys_rst_n]
+<: } :>
+set_property PULLUP true [get_ports sys_rst_n]
+
+###############################################################################
+# Physical Constraints
+###############################################################################
+#
+# SYS clock <=: ref_clk_freq :> MHz (input) signal. The sys_clk_p and sys_clk_n
+# signals are the PCI Express reference clock. Virtex-7 GT
+# Transceiver architecture requires the use of a dedicated clock
+# resources (FPGA input pins) associated with each GT Transceiver.
+# To use these pins an IBUFDS primitive (refclk_ibuf) is
+# instantiated in user's design.
+# Please refer to the Virtex-7 GT Transceiver User Guide
+# (UG) for guidelines regarding clock resource selection.
+#
+
+set_property LOC IBUFDS_GTE2_X0Y<=: expr {($x0y2_ln0 - 1) / 2} :> [get_cells refclk_ibuf]
+
+set_false_path -from [get_ports sys_rst_n]
+
+###############################################################################
+# Timing Constraints
+###############################################################################
+#
+<: ;#Set the frequncy on the received reference clock :>
+create_clock -name sys_clk -period <=: ref_clk_prd :> [get_ports sys_clk_p]
+#
+<: if {$pcie_ext_clk_string == "TRUE"}  { :>
+<#: ttcl/Timing_Constraints_xdc.ttcl :>
+<: } :>
+#
+###############################################################################
+# Physical Constraints
+###############################################################################
+<: if { $pcie_ext_gt_common_string == "TRUE"} { :>
+<: if {[starts_with $prj_fam "artix7"] || [starts_with $prj_fam "qartix7"] || [starts_with $prj_fam "aartix7"] || ([starts_with $prj_fam "zynq"] && [starts_with $prj_dev "xc7z015"])} {  :>
+<: ;# Artix GTP :>
+set_false_path -through [get_pins -hierarchical -filter {NAME=~*/PLL0LOCK}]
+<: } else { :>
+<: ;# Kintex/Virtex GTX :>
+set_false_path -through [get_pins -hierarchical -filter {NAME=~*/QPLLLOCK}]
+<: } :>
+<: } :>
+###############################################################################
+# End
+###############################################################################

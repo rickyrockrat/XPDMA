@@ -1,0 +1,98 @@
+<#: ttcl/GetValueSimParam.ttcl :>
+<: if {!$gen_x1y0_ucf} ttcl_return :>
+<: setFileName $ucf_name :>
+<: setFileExtension ".xdc" :>
+<: setOutputDirectory [ttcl_string_concat $ComponentName "/source"] :>
+<#: ttcl/header.ttcl :>
+#
+###############################################################################
+# User Time Names / User Time Groups / Time Specs
+###############################################################################
+
+###############################################################################
+# User Physical Constraints
+###############################################################################
+
+
+###############################################################################
+# Pinout and Related I/O Constraints
+###############################################################################
+#
+# Transceiver instance placement.  This constraint selects the
+# transceivers to be used, which also dictates the pinout for the
+# transmit and receive differential pairs.  Please refer to the
+# Virtex-7 GT Transceiver User Guide (UG) for more information.
+#
+
+<: ttcl_for {set ii 0;} {$ii < $max_lnk_wdt_int} { incr ii } { :>
+# PCIe Lane <=: ii :>
+set_property LOC <=: gt_channel_type :>_CHANNEL_X1Y<=: expr {$x1y0_ln0 - $ii} :> [get_cells {<=: design_path :>/<=: gt_path :>/pipe_wrapper_i/pipe_lane[<=: ii :>].gt_wrapper_i/<=: gt_channel_path :>}]
+<: } :>
+
+#
+# PCI Express Block placement. This constraint selects the PCI Express
+# Block to be used.
+#
+
+set_property LOC PCIE_X1Y0 [get_cells {<=: design_path :>/<=: pcie_path :>/pcie_block_i}]
+
+#
+# BlockRAM placement
+#
+
+set_property LOC RAMB36_X<=: $x1y0_xucf :>Y<=: ttcl_add $x1y0_yucf 4 :> [get_cells {<=: design_path :>/<=: bram_path :>/pcie_brams_rx/brams[0].ram/<=: ramb_path_xdc :>}]
+set_property LOC RAMB36_X<=: $x1y0_xucf :>Y<=: ttcl_add $x1y0_yucf 3 :> [get_cells {<=: design_path :>/<=: bram_path :>/pcie_brams_rx/brams[1].ram/<=: ramb_path_xdc :>}]
+set_property LOC RAMB36_X<=: $x1y0_xucf :>Y<=: ttcl_add $x1y0_yucf 1 :> [get_cells {<=: design_path :>/<=: bram_path :>/pcie_brams_tx/brams[0].ram/<=: ramb_path_xdc :>}]
+set_property LOC RAMB36_X<=: $x1y0_xucf :>Y<=: $x1y0_yucf :> [get_cells {<=: design_path :>/<=: bram_path :>/pcie_brams_tx/brams[1].ram/<=: ramb_path_xdc :>}]
+
+###############################################################################
+# Timing Constraints
+###############################################################################
+#
+<: ;#Set the frequncy on the output of the GT.  This value will propgate :>
+<: ;#to the MMCM and the clocks used in the design will all be auto generated. :>
+<: if {[starts_with $prj_fam "artix7"] || [starts_with $prj_fam "qartix7"] || [starts_with $prj_fam "aartix7"]} { :>
+create_clock -name txoutclk -period <=: ref_clk_prd :> [get_pins <=: design_path :>/<=: gt_path :>/pipe_wrapper_i/pipe_lane[0].gt_wrapper_i/gtp_channel.gtpe2_channel_i/TXOUTCLK]
+<: } else { :>
+create_clock -name txoutclk -period <=: ref_clk_prd :> [get_pins <=: design_path :>/<=: gt_path :>/pipe_wrapper_i/pipe_lane[0].gt_wrapper_i/gtx_channel.gtxe2_channel_i/TXOUTCLK]
+<: } :>
+#
+<: if {$pcie_ext_clk_string == "FALSE"}  { :>
+<#: ttcl/Timing_Constraints_xdc.ttcl :>
+<: } :>
+#
+###############################################################################
+# Physical Constraints
+###############################################################################
+#------------------------------------------------------------------------------
+# Asynchronous Paths
+#------------------------------------------------------------------------------
+
+
+set_false_path -through [get_pins -hierarchical -filter {NAME=~*/RXELECIDLE}]
+set_false_path -through [get_pins -hierarchical -filter {NAME=~*/TXPHINITDONE}]
+set_false_path -through [get_pins -hierarchical -filter {NAME=~*/TXPHALIGNDONE}]
+set_false_path -through [get_pins -hierarchical -filter {NAME=~*/TXDLYSRESETDONE}]
+set_false_path -through [get_pins -hierarchical -filter {NAME=~*/RXDLYSRESETDONE}]
+set_false_path -through [get_pins -hierarchical -filter {NAME=~*/RXPHALIGNDONE}]
+set_false_path -through [get_pins -hierarchical -filter {NAME=~*/RXCDRLOCK}]
+set_false_path -through [get_pins -hierarchical -filter {NAME=~*/CFGMSGRECEIVEDPMETO}]
+<: if {[starts_with $prj_fam "artix7"] || [starts_with $prj_fam "qartix7"] || [starts_with $prj_fam "aartix7"] || ([starts_with $prj_fam "zynq"] && [starts_with $prj_dev "xc7z015"])} {  :>
+<: ;# Artix GTP :>
+<: if { $pcie_ext_gt_common_string == "FALSE"} { :>
+set_false_path -through [get_pins -hierarchical -filter {NAME=~*/PLL0LOCK}]
+<: } :>
+set_false_path -through [get_pins -hierarchical -filter {NAME=~*/RXPMARESETDONE}]
+set_false_path -through [get_pins -hierarchical -filter {NAME=~*/RXSYNCDONE}]
+set_false_path -through [get_pins -hierarchical -filter {NAME=~*/TXSYNCDONE}]
+<: } else { :>
+<: ;# Kintex/Virtex GTX :>
+set_false_path -through [get_pins -hierarchical -filter {NAME=~*/CPLLLOCK}]
+<: if { $pcie_ext_gt_common_string == "FALSE"} { :>
+set_false_path -through [get_pins -hierarchical -filter {NAME=~*/QPLLLOCK}]
+<: } :>
+<: } :>
+
+###############################################################################
+# End
+###############################################################################

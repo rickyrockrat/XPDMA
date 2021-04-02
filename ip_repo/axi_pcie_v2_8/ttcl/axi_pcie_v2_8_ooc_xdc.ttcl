@@ -1,0 +1,26 @@
+<#: ttcl/GetValueSimParam.ttcl :>
+<: set c_dir_name "synth" :>
+<: setOutputDirectory $c_dir_name :>
+<: setFileUsedIn { out_of_context synthesis implementation } :>
+<: setFileName [ttcl_string_concat $ComponentName "_ooc"] :>
+<: setFileExtension ".xdc" :>
+<#: ttcl/header.ttcl :>
+#
+# This constraints file contains default clock frequencies to be used during out-of-context flows such as
+# OOC Synthesis and Hierarchical Designs. For best results the frequencies should be modified
+# to match the target frequencies. 
+# This constraints file is not used in normal top-down synthesis (the default flow of Vivado)
+#
+create_clock -name sys_clk -period <=: ref_clk_prd :> [get_ports REFCLK]
+# 100/250 MHz
+
+# AXI_ACLK and AXI_CTL_ACLK always have a frequency of 125 MHz
+<: if {($axi_aclk_loopback_string == "TRUE")} { :>
+<: if {($max_lnk_wdt_int == 1 && $max_lnk_spd_int == 0 && $pcie_axi_if_wdt_int == "64")} { :>
+create_clock -name axi_aclk -period 16 [get_ports axi_aclk]
+create_clock -name axi_ctl_aclk -period 16 [get_ports axi_ctl_aclk]
+<: } else {:>
+create_clock -name axi_aclk -period 8 [get_ports axi_aclk]
+create_clock -name axi_ctl_aclk -period 8 [get_ports axi_ctl_aclk]
+<: } :>
+<: } :>

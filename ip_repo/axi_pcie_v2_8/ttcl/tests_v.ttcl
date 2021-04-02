@@ -1,0 +1,7 @@
+<#: ttcl/GetValueSimParam.ttcl :>
+<: if {$include_rc} ttcl_return :>
+<: setFileName "tests" :>
+<: setFileExtension ".vh" :>
+<: setOutputDirectory [ttcl_string_concat $ComponentName "/simulation/tests"] :>
+<: set SVTEST [getSystemProperty "SV_TEST" "NULL"] :>
+`include "sample_tests1.vh"
